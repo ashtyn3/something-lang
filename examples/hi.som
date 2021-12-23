@@ -1,7 +1,7 @@
 (1 + 2 *3) // Infix expression
 RPN!(1 2 3 *+) // RPN expression
 
-hi :x i64, y i64: i64 {
+hi : x i64, y i64 : i64 {
     print! (24 + 22)
 }
 
