@@ -223,7 +223,16 @@ impl Lexer {
                         line: self.loc.line,
                     },
                 })
-            } else if self.ch == '+' || self.ch == '-' || self.ch == '/' || self.ch == '*' {
+            } else if self.ch == '/' && self.peek() == '/' {
+                while self.peek() != '\n' {
+                    self.read();
+                }
+                self.read();
+            } else if self.ch == '+'
+                || self.ch == '-'
+                || (self.ch == '/' && self.peek() != '/')
+                || self.ch == '*'
+            {
                 match self.ch {
                     '+' => self.tree.push(LexToken {
                         tok_type: TokenType::PLUSBIN,
