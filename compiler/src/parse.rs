@@ -195,8 +195,9 @@ impl Parser {
 
         //println!("{:?}", sub_tree);
         //println!("{:#?}", stack);
-        let bin_tree = Parser::new(stack, self.file.clone());
-        println!("{:?}", bin_tree.tree());
+        let bin_tree = Parser::new(stack.clone(), self.file.clone());
+        // println!("{:?}", bin_tree.tree());
+        // println!("{:#?}", &stack);
 
         ParseTok {
             tok_type: ParseType::EXP,
