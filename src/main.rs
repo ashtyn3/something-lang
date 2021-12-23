@@ -31,6 +31,10 @@ fn main() {
 
         lexer.lex();
 
+        if lexer.tree().len() == 0 {
+            std::process::exit(1);
+        }
+
         let mut parser = parse::Parser::new(lexer.tree(), file_content);
 
         parser.parse();
