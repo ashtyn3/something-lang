@@ -1,5 +1,4 @@
 use termion::color;
-use termion::cursor;
 pub mod parse;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -16,6 +15,8 @@ pub enum TokenType {
     LPAREN,
     RPAREN,
     MMARK,
+    COLON,
+    SEMCOLON,
 
     PLUSBIN,
     SUBBIN,
@@ -137,7 +138,7 @@ impl Lexer {
                 self.read();
                 self.tree.push(LexToken {
                     tok_type: TokenType::STRING,
-                    content: str_content,
+                    content: "\"".to_string() + &str_content + "\"",
                     loc: LexTokenLoc {
                         line_start: self.loc.line_start,
                         col: start_col,
@@ -202,6 +203,18 @@ impl Lexer {
                         line: self.loc.line,
                     },
                 })
+            } else if self.ch == ';' {
+                self.read();
+                self.tree.push(LexToken {
+                    tok_type: TokenType::SEMCOLON,
+                    content: String::from(";"),
+                    loc: LexTokenLoc {
+                        line_start: self.loc.line_start,
+                        col: self.loc.col,
+                        end_col: self.loc.col,
+                        line: self.loc.line,
+                    },
+                })
             } else if self.ch == '-' && self.peek().is_numeric() {
                 let start_col = self.loc.col;
 
@@ -232,6 +245,7 @@ impl Lexer {
                 || self.ch == '-'
                 || (self.ch == '/' && self.peek() != '/')
                 || self.ch == '*'
+                || self.ch == ':'
             {
                 match self.ch {
                     '+' => self.tree.push(LexToken {
@@ -256,7 +270,7 @@ impl Lexer {
                     }),
 
                     '/' => self.tree.push(LexToken {
-                        tok_type: TokenType::MULBIN,
+                        tok_type: TokenType::DIVBIN,
                         content: String::from("/"),
                         loc: LexTokenLoc {
                             line_start: self.loc.line_start,
@@ -268,6 +282,16 @@ impl Lexer {
                     '*' => self.tree.push(LexToken {
                         tok_type: TokenType::MULBIN,
                         content: String::from("*"),
+                        loc: LexTokenLoc {
+                            line_start: self.loc.line_start,
+                            col: self.loc.col,
+                            end_col: self.loc.col,
+                            line: self.loc.line,
+                        },
+                    }),
+                    ':' => self.tree.push(LexToken {
+                        tok_type: TokenType::COLON,
+                        content: String::from(":"),
                         loc: LexTokenLoc {
                             line_start: self.loc.line_start,
                             col: self.loc.col,

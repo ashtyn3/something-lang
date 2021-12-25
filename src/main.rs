@@ -1,5 +1,6 @@
 use clap::{App, Arg};
 use compiler;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 
@@ -34,9 +35,11 @@ fn main() {
         if lexer.tree().len() == 0 {
             std::process::exit(1);
         }
+        let mut global_scope: HashMap<String, compiler::parse::ParseTok> = HashMap::new();
 
-        let mut parser = parse::Parser::new(lexer.tree(), file_content);
+        let mut parser = parse::Parser::new(lexer.tree(), file_content, global_scope);
 
-        parser.parse();
+        parser.init();
+        println!("{:#?}", parser.tree())
     }
 }
