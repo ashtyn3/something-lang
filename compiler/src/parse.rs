@@ -18,14 +18,15 @@ pub enum ParseType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Primitives {
-    INT,
-    SIGINT,
-    FLOAT,
-    SIGFLOAT,
+    INT(i8),
+    SIGINT(i8),
+    FLOAT(i8),
+
     STRING,
     KEYWORD,
     FUNCTION,
     OPERATOR,
+    INSCOPE(String),
 }
 
 #[derive(Clone, Debug)]
@@ -38,7 +39,7 @@ pub enum BinOperand {
 
 #[derive(Clone, Debug)]
 pub struct VarInit {
-    value_type: String,
+    value_type: Primitives,
     name: String,
     value: ParseTok,
 }
@@ -71,7 +72,7 @@ pub struct Number {
 
 #[derive(Clone, Debug)]
 pub struct Label {
-    var_type: String,
+    var_type: Primitives,
     name: String,
 }
 
@@ -109,7 +110,9 @@ pub struct Parser {
 
     curr_scope: HashMap<String, ParseTok>,
 }
-
+fn prim_eq(a: &Primitives, b: &Primitives) -> bool {
+    std::mem::discriminant(a) == std::mem::discriminant(b)
+}
 fn op_prec(op: &str) -> u16 {
     match op {
         "+" => 10,
@@ -168,6 +171,30 @@ impl Parser {
             ParseType::NUMBER => tok.number.unwrap().num_type,
             ParseType::STRING => Primitives::STRING,
             ParseType::OPERATOR => Primitives::OPERATOR,
+            ParseType::LABEL => {
+                if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i8".to_string()) {
+                    Primitives::INT(8)
+                } else if tok.clone().ident.unwrap().var_type
+                    == Primitives::INSCOPE("i16".to_string())
+                {
+                    Primitives::INT(16)
+                } else if tok.clone().ident.unwrap().var_type
+                    == Primitives::INSCOPE("i32".to_string())
+                {
+                    Primitives::INT(32)
+                } else if tok.clone().ident.unwrap().var_type
+                    == Primitives::INSCOPE("i64".to_string())
+                {
+                    Primitives::INT(64)
+                } else if tok.clone().ident.unwrap().var_type
+                    == Primitives::INSCOPE("str".to_string())
+                {
+                    Primitives::STRING
+                } else {
+                    unimplemented!()
+                }
+            }
+
             _ => {
                 println!(
                     "Unknown Primitive ({line},{col}): {:?}",
@@ -359,7 +386,7 @@ impl Parser {
                     line: self.tok.loc.line,
                 },
                 number: Some(Number {
-                    num_type: Primitives::FLOAT,
+                    num_type: Primitives::FLOAT(32),
                     float: Some(self.tok.content.parse::<f64>().unwrap()),
                     number: None,
                 }),
@@ -378,7 +405,7 @@ impl Parser {
                     line: self.tok.loc.line,
                 },
                 number: Some(Number {
-                    num_type: Primitives::SIGFLOAT,
+                    num_type: Primitives::FLOAT(32),
                     float: Some(self.tok.content.parse::<f64>().unwrap()),
                     number: None,
                 }),
@@ -399,7 +426,7 @@ impl Parser {
                     line: self.tok.loc.line,
                 },
                 number: Some(Number {
-                    num_type: Primitives::SIGINT,
+                    num_type: Primitives::SIGINT(32),
                     number: Some(self.tok.content.parse::<i64>().unwrap()),
                     float: None,
                 }),
@@ -418,7 +445,7 @@ impl Parser {
                     line: self.tok.loc.line,
                 },
                 number: Some(Number {
-                    num_type: Primitives::INT,
+                    num_type: Primitives::INT(32),
                     number: Some(self.tok.content.parse::<i64>().unwrap()),
                     float: None,
                 }),
@@ -492,7 +519,7 @@ impl Parser {
         self.next_tok(); // eat RPN
         self.next_tok(); // eat !
 
-        let mut prim_type: Primitives = Primitives::INT;
+        let mut prim_type: Primitives = Primitives::INT(32);
         let mut count = 0;
 
         let mut output_tree: Vec<BinSeg> = vec![];
@@ -514,7 +541,8 @@ impl Parser {
             }
 
             let tok_prim = self.get_prim(parse_out.clone());
-            if tok_prim != prim_type && tok_prim != Primitives::OPERATOR {
+
+            if prim_eq(&tok_prim, &prim_type) == false && tok_prim != Primitives::OPERATOR {
                 println!(
                     "Bad Types ({line},{col}): Cannot use type {:?} with type {:?}",
                     tok_prim,
@@ -532,10 +560,9 @@ impl Parser {
             } else if tok_prim == Primitives::OPERATOR {
                 let left = working_stack.pop();
                 let right = working_stack.pop();
-                if prim_type == Primitives::INT
-                    || prim_type == Primitives::SIGINT
-                    || prim_type == Primitives::FLOAT
-                    || prim_type == Primitives::SIGFLOAT
+                if prim_eq(&prim_type, &Primitives::INT(32))
+                    || prim_eq(&prim_type, &Primitives::SIGINT(32))
+                    || prim_eq(&prim_type, &Primitives::FLOAT(32))
                 {
                     if right.is_some() {
                         output_tree.push(BinSeg {
@@ -594,7 +621,7 @@ impl Parser {
             std::process::exit(1);
         }
         self.next_tok();
-        let var_type = self.tok.content.clone();
+        let var_type = Primitives::INSCOPE(self.tok.content.clone());
         if self.peek().tok_type != TokenType::COLON {
             println!(
                 "Unknown parser token ({line}:{col}): Expected token of type LABEL instead got {:?}",
@@ -615,7 +642,7 @@ impl Parser {
         let body = Parser::new(sub_tree, self.file.clone(), self.curr_scope.clone()).parse();
 
         self.next_tok();
-        return ParseTok {
+        let ret_tok = ParseTok {
             tok_type: ParseType::EXP,
             location: ParseLoc {
                 start_col,
@@ -628,11 +655,14 @@ impl Parser {
             operand: None,
             ident: None,
             variable: Box::new(Some(VarInit {
-                value_type: var_type.to_string(),
+                value_type: var_type,
                 name: name.to_string(),
                 value: body,
             })),
         };
+        self.curr_scope.insert(name.to_string(), ret_tok.clone());
+
+        return ret_tok;
     }
 
     pub fn tree(self) -> Vec<ParseTok> {
