@@ -39,76 +39,76 @@ pub enum BinOperand {
 
 #[derive(Clone, Debug)]
 pub struct VarInit {
-    value_type: Primitives,
-    name: String,
-    value: ParseTok,
+    pub value_type: Primitives,
+    pub name: String,
+    pub value: ParseTok,
 }
 
 #[derive(Clone, Debug)]
 pub struct BinSeg {
-    left: ParseTok,
-    right: Option<ParseTok>,
+    pub left: ParseTok,
+    pub right: Option<ParseTok>,
 
-    operation: BinOperand,
+    pub operation: BinOperand,
 }
 
 #[derive(Clone, Debug)]
 pub struct Exp {
-    exp_type: Primitives,
-    body: Vec<BinSeg>,
+    pub exp_type: Primitives,
+    pub body: Vec<BinSeg>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Operand {
-    op_type: BinOperand,
+    pub op_type: BinOperand,
 }
 
 #[derive(Clone, Debug)]
 pub struct Number {
-    num_type: Primitives,
-    number: Option<i64>,
-    float: Option<f64>,
+    pub num_type: Primitives,
+    pub number: Option<i64>,
+    pub float: Option<f64>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Label {
-    var_type: Primitives,
-    name: String,
+    pub var_type: Primitives,
+    pub name: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct StringT {
-    length: usize,
-    content: String,
+    pub length: usize,
+    pub content: String,
 }
 #[derive(Clone, Debug)]
 pub struct ParseLoc {
-    start_col: usize,
-    end_col: usize,
-    line: u32,
+    pub start_col: usize,
+    pub end_col: usize,
+    pub line: u32,
 }
 
 #[derive(Clone, Debug)]
 pub struct ParseTok {
-    tok_type: ParseType,
-    location: ParseLoc,
-    expression: Option<Exp>,
-    number: Option<Number>,
-    string: Option<StringT>,
-    operand: Option<Operand>,
-    ident: Option<Label>,
-    variable: Box<Option<VarInit>>,
+    pub tok_type: ParseType,
+    pub location: ParseLoc,
+    pub expression: Option<Exp>,
+    pub number: Option<Number>,
+    pub string: Option<StringT>,
+    pub operand: Option<Operand>,
+    pub ident: Option<Label>,
+    pub variable: Box<Option<VarInit>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Parser {
-    tok: LexToken,
-    tree: Vec<ParseTok>,
-    lex_tree: Vec<LexToken>,
-    lex_id: usize,
+    pub tok: LexToken,
+    pub tree: Vec<ParseTok>,
+    pub lex_tree: Vec<LexToken>,
+    pub lex_id: usize,
     pub file: String,
 
-    curr_scope: HashMap<String, ParseTok>,
+    pub curr_scope: HashMap<String, ParseTok>,
 }
 fn prim_eq(a: &Primitives, b: &Primitives) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
