@@ -40,6 +40,26 @@ fn main() {
         let mut parser = parse::Parser::new(lexer.tree(), file_content, global_scope);
 
         parser.init();
-        println!("{:#?}", parser.tree())
+        let mut main_buffer: Vec<String> = vec![String::from("int main() {")];
+        let def = &mut HashMap::new();
+        for tok in parser.tree() {
+            let gen = compiler::generation::gen(
+                compiler::generation::DescriptorToken {
+                    token_real_type: None,
+                    token: tok,
+                },
+                "_".to_string(),
+                def,
+            );
+            main_buffer.push(gen);
+        }
+        main_buffer.push(String::from("return 0;\n}"));
+        let mut defs: Vec<String> = def
+            .values()
+            .map(|item| -> String { item.def.clone() })
+            .collect();
+        defs.append(&mut main_buffer);
+        let joined = defs.join("\n");
+        println!("{}", joined);
     }
 }

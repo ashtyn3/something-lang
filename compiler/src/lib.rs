@@ -1,4 +1,5 @@
 use termion::color;
+pub mod generation;
 pub mod parse;
 
 #[derive(Clone, Debug, PartialEq)]

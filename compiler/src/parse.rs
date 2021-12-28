@@ -16,7 +16,7 @@ pub enum ParseType {
     VARDEF,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub enum Primitives {
     INT(i8),
     SIGINT(i8),
@@ -110,7 +110,7 @@ pub struct Parser {
 
     pub curr_scope: HashMap<String, ParseTok>,
 }
-fn prim_eq(a: &Primitives, b: &Primitives) -> bool {
+pub fn prim_eq(a: &Primitives, b: &Primitives) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
 }
 fn op_prec(op: &str) -> u16 {
@@ -154,7 +154,57 @@ fn _op_asso(op: &str) -> &str {
 }
 
 //fn rpn_exp_wrapper() {}
+pub fn keyword_types(prim: Primitives) -> Primitives {
+    if prim == Primitives::INSCOPE("i8".to_string()) {
+        Primitives::INT(8)
+    } else if prim == Primitives::INSCOPE("i16".to_string()) {
+        Primitives::INT(16)
+    } else if prim == Primitives::INSCOPE("i32".to_string()) {
+        Primitives::INT(32)
+    } else if prim == Primitives::INSCOPE("i64".to_string()) {
+        Primitives::INT(64)
+    } else if prim == Primitives::INSCOPE("str".to_string()) {
+        Primitives::STRING
+    } else {
+        prim
+    }
+}
+fn get_prim(tok: ParseTok) -> Primitives {
+    match tok.tok_type {
+        ParseType::NUMBER => tok.number.unwrap().num_type,
+        ParseType::STRING => Primitives::STRING,
+        ParseType::OPERATOR => Primitives::OPERATOR,
+        ParseType::LABEL => {
+            if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i8".to_string()) {
+                Primitives::INT(8)
+            } else if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i16".to_string())
+            {
+                Primitives::INT(16)
+            } else if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i32".to_string())
+            {
+                Primitives::INT(32)
+            } else if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i64".to_string())
+            {
+                Primitives::INT(64)
+            } else if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("str".to_string())
+            {
+                Primitives::STRING
+            } else {
+                unimplemented!()
+            }
+        }
 
+        _ => {
+            println!(
+                "Unknown Primitive ({line},{col}): {:?}",
+                tok.tok_type,
+                line = tok.location.line,
+                col = tok.location.start_col
+            );
+            std::process::exit(1);
+        }
+    }
+}
 impl Parser {
     pub fn new(lex_tree: Vec<LexToken>, f: String, scope: HashMap<String, ParseTok>) -> Self {
         Self {
@@ -164,46 +214,6 @@ impl Parser {
             lex_id: 0,
             file: f,
             curr_scope: scope,
-        }
-    }
-    fn get_prim(&mut self, tok: ParseTok) -> Primitives {
-        match tok.tok_type {
-            ParseType::NUMBER => tok.number.unwrap().num_type,
-            ParseType::STRING => Primitives::STRING,
-            ParseType::OPERATOR => Primitives::OPERATOR,
-            ParseType::LABEL => {
-                if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i8".to_string()) {
-                    Primitives::INT(8)
-                } else if tok.clone().ident.unwrap().var_type
-                    == Primitives::INSCOPE("i16".to_string())
-                {
-                    Primitives::INT(16)
-                } else if tok.clone().ident.unwrap().var_type
-                    == Primitives::INSCOPE("i32".to_string())
-                {
-                    Primitives::INT(32)
-                } else if tok.clone().ident.unwrap().var_type
-                    == Primitives::INSCOPE("i64".to_string())
-                {
-                    Primitives::INT(64)
-                } else if tok.clone().ident.unwrap().var_type
-                    == Primitives::INSCOPE("str".to_string())
-                {
-                    Primitives::STRING
-                } else {
-                    unimplemented!()
-                }
-            }
-
-            _ => {
-                println!(
-                    "Unknown Primitive ({line},{col}): {:?}",
-                    tok.tok_type,
-                    line = self.tok.loc.line,
-                    col = self.tok.loc.col
-                );
-                std::process::exit(1);
-            }
         }
     }
     pub fn next_tok(&mut self) {
@@ -519,7 +529,7 @@ impl Parser {
         self.next_tok(); // eat RPN
         self.next_tok(); // eat !
 
-        let mut prim_type: Primitives = Primitives::INT(32);
+        let mut exp_prim_type: Primitives = Primitives::INT(32);
         let mut count = 0;
 
         let mut output_tree: Vec<BinSeg> = vec![];
@@ -534,19 +544,19 @@ impl Parser {
             if count == 0 {
                 let whole_type = parse_out.tok_type.clone();
                 if whole_type == ParseType::NUMBER {
-                    prim_type = parse_out.clone().number.unwrap().num_type;
+                    exp_prim_type = parse_out.clone().number.unwrap().num_type;
                 } else if whole_type == ParseType::STRING {
-                    prim_type = Primitives::STRING;
+                    exp_prim_type = Primitives::STRING;
                 }
             }
 
-            let tok_prim = self.get_prim(parse_out.clone());
+            let tok_prim = get_prim(parse_out.clone());
 
-            if prim_eq(&tok_prim, &prim_type) == false && tok_prim != Primitives::OPERATOR {
+            if prim_eq(&tok_prim, &exp_prim_type) == false && tok_prim != Primitives::OPERATOR {
                 println!(
                     "Bad Types ({line},{col}): Cannot use type {:?} with type {:?}",
                     tok_prim,
-                    prim_type,
+                    exp_prim_type,
                     line = self.tok.loc.line,
                     col = self.tok.loc.col
                 );
@@ -560,9 +570,9 @@ impl Parser {
             } else if tok_prim == Primitives::OPERATOR {
                 let left = working_stack.pop();
                 let right = working_stack.pop();
-                if prim_eq(&prim_type, &Primitives::INT(32))
-                    || prim_eq(&prim_type, &Primitives::SIGINT(32))
-                    || prim_eq(&prim_type, &Primitives::FLOAT(32))
+                if prim_eq(&exp_prim_type, &Primitives::INT(32))
+                    || prim_eq(&exp_prim_type, &Primitives::SIGINT(32))
+                    || prim_eq(&exp_prim_type, &Primitives::FLOAT(32))
                 {
                     if right.is_some() {
                         output_tree.push(BinSeg {
@@ -597,7 +607,7 @@ impl Parser {
                 line: self.tok.loc.line,
             },
             expression: Some(Exp {
-                exp_type: prim_type,
+                exp_type: exp_prim_type,
                 body: output_tree,
             }),
             number: None,
@@ -643,7 +653,7 @@ impl Parser {
 
         self.next_tok();
         let ret_tok = ParseTok {
-            tok_type: ParseType::EXP,
+            tok_type: ParseType::VARDEF,
             location: ParseLoc {
                 start_col,
                 end_col: self.tok.loc.end_col,
@@ -655,7 +665,7 @@ impl Parser {
             operand: None,
             ident: None,
             variable: Box::new(Some(VarInit {
-                value_type: var_type,
+                value_type: keyword_types(var_type),
                 name: name.to_string(),
                 value: body,
             })),
