@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+use utils;
 
 use compiler::*;
 fn main() {
@@ -62,6 +63,6 @@ fn main() {
         defs.append(&mut main_buffer);
         defs.insert(0, "#include<memory>".to_string());
         let joined = defs.join("\n");
-        fs::write("./out.cc", joined);
+        utils::make_work(joined);
     }
 }
