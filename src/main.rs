@@ -1,5 +1,6 @@
 use clap::{App, Arg};
 use compiler;
+use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -41,7 +42,7 @@ fn main() {
 
         parser.init();
         let mut main_buffer: Vec<String> = vec![String::from("int main() {")];
-        let def = &mut HashMap::new();
+        let def = &mut IndexMap::new();
         for tok in parser.tree() {
             let gen = compiler::generation::gen(
                 compiler::generation::DescriptorToken {
@@ -59,7 +60,8 @@ fn main() {
             .map(|item| -> String { item.def.clone() })
             .collect();
         defs.append(&mut main_buffer);
+        defs.insert(0, "#include<memory>".to_string());
         let joined = defs.join("\n");
-        println!("{}", joined);
+        fs::write("./out.cc", joined);
     }
 }

@@ -11,4 +11,4 @@ edition = "2021"
 [dependencies]
 compiler = {path = "compiler"}
 clap = "2.34.0"
-
+indexmap = "1.7.0"

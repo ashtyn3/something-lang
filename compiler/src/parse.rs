@@ -165,6 +165,10 @@ pub fn keyword_types(prim: Primitives) -> Primitives {
         Primitives::INT(64)
     } else if prim == Primitives::INSCOPE("str".to_string()) {
         Primitives::STRING
+    } else if prim == Primitives::INSCOPE("f32".to_string()) {
+        Primitives::FLOAT(32)
+    } else if prim == Primitives::INSCOPE("f64".to_string()) {
+        Primitives::FLOAT(64)
     } else {
         prim
     }
@@ -186,6 +190,12 @@ fn get_prim(tok: ParseTok) -> Primitives {
             } else if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i64".to_string())
             {
                 Primitives::INT(64)
+            } else if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("f64".to_string())
+            {
+                Primitives::FLOAT(64)
+            } else if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("f32".to_string())
+            {
+                Primitives::FLOAT(32)
             } else if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("str".to_string())
             {
                 Primitives::STRING

@@ -1,6 +1,6 @@
 use crate::parse;
+use indexmap::IndexMap;
 use nanoid::nanoid;
-use std::collections::HashMap;
 
 pub struct Function {
     name: String,
@@ -8,11 +8,13 @@ pub struct Function {
     lines: Vec<String>,
 }
 
+#[derive(Debug)]
 pub struct PrimType {
     pub def: String,
     pub name: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct DescriptorToken {
     pub token_real_type: Option<parse::Primitives>,
     pub token: parse::ParseTok,
@@ -27,7 +29,7 @@ pub fn prim_var_str(type_: parse::Primitives) -> Vec<String> {
     }
 }
 
-pub fn init_str_lit(definitions: &mut HashMap<parse::Primitives, PrimType>) {
+pub fn init_str_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>) {
     definitions.insert(
         parse::Primitives::STRING,
         PrimType {
@@ -45,7 +47,7 @@ struct STR_LIT {
     );
 }
 
-pub fn init_int_lit(definitions: &mut HashMap<parse::Primitives, PrimType>, size: String) {
+pub fn init_int_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>, size: String) {
     definitions.insert(
         parse::Primitives::INT(size.parse::<i8>().unwrap()),
         PrimType {
@@ -62,59 +64,87 @@ pub fn init_int_lit(definitions: &mut HashMap<parse::Primitives, PrimType>, size
         },
     );
 }
+
+pub fn init_float_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>, size: String) {
+    if String::from("32") == size {
+        definitions.insert(
+            parse::Primitives::FLOAT(32),
+            PrimType {
+                def: "\nstruct FLOAT".to_owned()
+                    + &size
+                    + "_LIT {\nfloat num;\nFLOAT"
+                    + &size
+                    + "_LIT(float f) : num(f){};\n};",
+                name: String::from("FLOAT".to_owned() + &size + "_LIT"),
+            },
+        );
+    }
+}
+
 pub fn init_fn_math(
-    definitions: &mut HashMap<parse::Primitives, PrimType>,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
     size: String,
     type_: String,
 ) {
+    let first_letter = type_.as_bytes()[0].to_owned() as char;
     definitions.insert(
-        parse::Primitives::INSCOPE("i".to_owned() + &size+"_ADD"),
+        parse::Primitives::INSCOPE(String::from(first_letter) + &size+"_PLUS"),
         PrimType {
             def: format!(
-                "{TYPE}{size}_LIT S{size}_ADD({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num + y.num;}};", size=size, TYPE=type_
+                "{TYPE}{size}_LIT {TYPE}{size}_PLUS({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num + y.num;}};", size=size, TYPE=type_
+                 ),
+            name: String::from(type_.clone()+ &size + "_LIT"),
+        },
+    );
+    definitions.insert(
+        parse::Primitives::INSCOPE(String::from(first_letter)+ &size+"_SUB"),
+        PrimType {
+            def: format!(
+                "{TYPE}{size}_LIT {TYPE}{size}_SUB({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num - y.num;}};", size=size, TYPE=type_
             ),
             name: String::from(type_.clone()+ &size + "_LIT"),
         },
     );
     definitions.insert(
-        parse::Primitives::INSCOPE("i".to_owned() + &size+"_SUB"),
+        parse::Primitives::INSCOPE(String::from(first_letter)+ &size+"_MUL"),
         PrimType {
             def: format!(
-                "{TYPE}{size}_LIT S{size}_SUB({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num - y.num;}};", size=size, TYPE=type_
+                "{TYPE}{size}_LIT {TYPE}{size}_MUL({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num * y.num;}};", size=size, TYPE=type_
             ),
             name: String::from(type_.clone()+ &size + "_LIT"),
         },
     );
     definitions.insert(
-        parse::Primitives::INSCOPE("i".to_owned() + &size+"_MUL"),
+        parse::Primitives::INSCOPE(String::from(first_letter)+ &size+"_DIV"),
         PrimType {
             def: format!(
-                "{TYPE}{size}_LIT S{size}_MUL({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num * y.num;}};", size=size, TYPE=type_
-            ),
-            name: String::from(type_.clone()+ &size + "_LIT"),
-        },
-    );
-    definitions.insert(
-        parse::Primitives::INSCOPE("i".to_owned() + &size+"_DIV"),
-        PrimType {
-            def: format!(
-                "{TYPE}{size}_LIT S{size}_DIV({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num / y.num;}};", size=size, TYPE=type_
+                "{TYPE}{size}_LIT {TYPE}{size}_DIV({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num / y.num;}};", size=size, TYPE=type_
             ),
             name: String::from(type_.clone()+ &size + "_LIT"),
         },
     );
 }
 
+fn init_lib(definitions: &mut IndexMap<parse::Primitives, PrimType>, tok_type: parse::Primitives) {
+    if parse::prim_eq(&tok_type, &parse::Primitives::INT(32)) {
+        let variant = prim_var_str(tok_type);
+        init_int_lit(definitions, variant[1].clone());
+        init_fn_math(definitions, variant[1].clone(), variant[0].clone());
+    } else if parse::prim_eq(&tok_type, &parse::Primitives::FLOAT(32)) {
+        let variant = prim_var_str(tok_type);
+        init_float_lit(definitions, variant[1].clone());
+        init_fn_math(definitions, variant[1].clone(), variant[0].clone());
+    }
+}
+
 pub fn make_var_def(
     _scope: String,
-    definitions: &mut HashMap<parse::Primitives, PrimType>,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
     name: String,
     var_type: parse::Primitives,
     value: DescriptorToken,
 ) -> String {
-    if definitions.get(&var_type).is_none() {
-        init_int_lit(definitions, prim_var_str(var_type.clone())[1].clone())
-    }
+    init_lib(definitions, var_type.clone());
     let type_ = definitions[&var_type].name.clone();
 
     let mut base = vec![format!("std::unique_ptr<{}> {};", type_, name)];
@@ -139,12 +169,11 @@ pub fn make_exp_seg(
     scope: String,
     seg: parse::BinSeg,
     last_id: String,
-    definitions: &mut HashMap<parse::Primitives, PrimType>,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
 ) -> ExpSeg {
     let mut decl_str: Vec<String> = vec![];
     let id = scope.clone() + "_" + &gen_id();
     if parse::prim_eq(&exp_type, &parse::Primitives::INT(32)) {
-        init_fn_math(definitions, size.clone(), "INT".to_string());
         let left = gen(
             DescriptorToken {
                 token: seg.left,
@@ -162,14 +191,13 @@ pub fn make_exp_seg(
                 scope.clone(),
                 definitions,
             );
-            let line = format!("std::unique_ptr<INT{size}_LIT> {name}(INT{size}_LIT(INT{size}_{:?}({left}, {right})));",seg.operation,name=id,size=size.clone(),left=left,right=right);
+            let line = format!("std::unique_ptr<INT{size}_LIT> {name}(new INT{size}_LIT(INT{size}_{:?}({left}, {right})));",seg.operation,name=id,size=size.clone(),left=left,right=right);
             decl_str.push(line)
         } else {
             let line = format!("std::unique_ptr<INT{size}_LIT> {name}(new INT{size}_LIT(INT{size}_{:?}({left}, *{right})));",seg.operation,name=id,size=size.clone(),left=left,right=last_id);
             decl_str.push(line)
         }
     } else if parse::prim_eq(&exp_type, &parse::Primitives::SIGINT(32)) {
-        init_fn_math(definitions, size.clone(), "SIGINT".to_string());
         let left = gen(
             DescriptorToken {
                 token: seg.left,
@@ -194,7 +222,6 @@ pub fn make_exp_seg(
             decl_str.push(line)
         }
     } else if parse::prim_eq(&exp_type, &parse::Primitives::FLOAT(32)) {
-        init_fn_math(definitions, size.clone(), "FLOAT".to_string());
         let left = gen(
             DescriptorToken {
                 token: seg.left,
@@ -227,9 +254,9 @@ pub fn make_exp_seg(
 pub fn make_exp(
     scope: String,
     parent: DescriptorToken,
-    definitions: &mut HashMap<parse::Primitives, PrimType>,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
 ) -> String {
-    let body = parent.token;
+    let body = &parent.token;
 
     let mut exp_type = body.clone().expression.unwrap().exp_type;
     if parent.token_real_type.is_some() {
@@ -250,7 +277,7 @@ pub fn make_exp(
     }
     let mut decl_strs: Vec<String> = vec![];
     let mut symbols: Vec<String> = vec![];
-    for seg in body.expression.unwrap().body {
+    for seg in body.clone().expression.unwrap().body {
         let seg = make_exp_seg(
             exp_type.clone(),
             size.to_string(),
@@ -265,7 +292,7 @@ pub fn make_exp(
 
     if parse::prim_eq(&exp_type, &parse::Primitives::INT(32)) {
         let line = format!(
-            "{name}= std::make_unique<INT{size}_LIT>(*{v})));",
+            "{name}= std::make_unique<INT{size}_LIT>(*{v});",
             name = scope,
             size = size.clone(),
             v = symbols.last().unwrap().to_string(),
@@ -273,7 +300,7 @@ pub fn make_exp(
         decl_strs.push(line)
     } else if parse::prim_eq(&exp_type, &parse::Primitives::SIGINT(32)) {
         let line = format!(
-            "{name}= std::make_unique<SIGINT{size}_LIT>(*{v})));",
+            "{name}= std::make_unique<SIGINT{size}_LIT>(*{v});",
             name = scope,
             size = size.clone(),
             v = symbols.last().unwrap().to_string(),
@@ -281,7 +308,7 @@ pub fn make_exp(
         decl_strs.push(line)
     } else if parse::prim_eq(&exp_type, &parse::Primitives::FLOAT(32)) {
         let line = format!(
-            "{name}= std::make_unique<FLOAT{size}_LIT>(*{v})));",
+            "{name}= std::make_unique<FLOAT{size}_LIT>(*{v});",
             name = scope,
             size = size.clone(),
             v = symbols.last().unwrap().to_string(),
@@ -293,13 +320,12 @@ pub fn make_exp(
 
 pub fn make_number(
     tok: DescriptorToken,
-    definitions: &mut HashMap<parse::Primitives, PrimType>,
+    _definitions: &mut IndexMap<parse::Primitives, PrimType>,
 ) -> String {
     let mut type_ = prim_var_str(tok.token.number.clone().unwrap().num_type);
     if tok.token_real_type.is_some() {
         type_ = prim_var_str(tok.token_real_type.unwrap());
     }
-    init_int_lit(definitions, type_[1].clone());
 
     if parse::prim_eq(
         &tok.token.number.clone().unwrap().num_type,
@@ -324,13 +350,13 @@ pub fn make_number(
 pub fn gen(
     tok: DescriptorToken,
     scope_name: String,
-    definitions: &mut HashMap<parse::Primitives, PrimType>,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
 ) -> String {
     if tok.token.tok_type == parse::ParseType::VARDEF {
         let var = tok.token.variable.clone().unwrap();
         let value = DescriptorToken {
             token_real_type: Some(tok.token.variable.unwrap().value_type),
-            token: var.value,
+            token: var.value.clone(),
         };
         make_var_def(scope_name, definitions, var.name, var.value_type, value)
     } else if tok.token.tok_type == parse::ParseType::EXP {
