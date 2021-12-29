@@ -26,3 +26,8 @@ pub fn make_work(content: String) {
     dir.pop();
     fs::remove_dir(dir);
 }
+
+pub fn clean_work() {
+    let dir = env::temp_dir();
+    fs::remove_dir(dir);
+}

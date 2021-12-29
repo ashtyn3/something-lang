@@ -19,6 +19,13 @@ fn main() {
                 .required(true)
                 .help("input file filename"),
         )
+        .arg(
+            Arg::with_name("dev-mode")
+                .short("d")
+                .long("dev")
+                .takes_value(false)
+                .help("Prevents work directory clean up."),
+        )
         .get_matches();
 
     let f = fs::read_to_string(file.value_of("file_name").unwrap());
@@ -64,5 +71,8 @@ fn main() {
         defs.insert(0, "#include<memory>".to_string());
         let joined = defs.join("\n");
         utils::make_work(joined);
+        if file.index_of("dev-mode").is_none() {
+            utils::clean_work();
+        }
     }
 }
