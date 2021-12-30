@@ -26,6 +26,13 @@ fn main() {
                 .takes_value(false)
                 .help("Prevents work directory clean up."),
         )
+        .arg(
+            Arg::with_name("gen")
+                .short("g")
+                .long("gen")
+                .takes_value(false)
+                .help("Stops compiler at generation step (this also stops cleaning of work directory)."),
+        )
         .get_matches();
 
     let f = fs::read_to_string(file.value_of("file_name").unwrap());
@@ -70,9 +77,13 @@ fn main() {
         defs.append(&mut main_buffer);
         defs.insert(0, "#include<memory>".to_string());
         let joined = defs.join("\n");
-        utils::make_work(joined);
-        if file.index_of("dev-mode").is_none() {
-            utils::clean_work();
+        if file.index_of("gen").is_none() {
+            utils::make_work(joined, true);
+            if file.index_of("dev-mode").is_none() {
+                utils::clean_work();
+            }
+        } else {
+            utils::make_work(joined, false);
         }
     }
 }
