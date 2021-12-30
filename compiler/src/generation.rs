@@ -34,11 +34,12 @@ pub fn init_str_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>) {
         parse::Primitives::STRING,
         PrimType {
             def: "
+#include <string>
 struct STR_LIT {
   int length;
-  string chs;
-  string display() { return chs; };
-  str_lit(string str) : chs(str);
+  std::string chs;
+  std::string display() { return chs; };
+  STR_LIT(std::string str) : chs(str){};
 };
             "
             .to_string(),
@@ -70,9 +71,9 @@ pub fn init_float_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>, s
         definitions.insert(
             parse::Primitives::FLOAT(32),
             PrimType {
-                def: "\nstruct FLOAT".to_owned()
+                def: "\n#include <string>\nstruct FLOAT".to_owned()
                     + &size
-                    + "_LIT {\nfloat num;\nFLOAT"
+                    + "_LIT {\nfloat num;\nstd::string display() { return std::to_string(num); };\nFLOAT"
                     + &size
                     + "_LIT(float f) : num(f){};\n};",
                 name: String::from("FLOAT".to_owned() + &size + "_LIT"),
@@ -137,6 +138,28 @@ fn init_lib(definitions: &mut IndexMap<parse::Primitives, PrimType>, tok_type: p
     }
 }
 
+pub fn init_fn_io(definitions: &mut IndexMap<parse::Primitives, PrimType>) {
+    definitions.insert(
+        parse::Primitives::INSCOPE("PRINT".to_string()),
+        PrimType {
+            def: format!(
+                "
+#include <cstdio>
+#include <vector>
+void PRINT(std::vector<std::unique_ptr<STR_LIT>>* ARGS) {{
+  for (int i = 0; i < ARGS->size(); i++) {{
+    STR_LIT t = *ARGS->at(i);
+    printf(\"%s\", t.chs.c_str());
+  }}
+}}
+                "
+            )
+            .to_string(),
+            name: "PRINT".to_string(),
+        },
+    );
+}
+
 pub fn make_var_def(
     _scope: String,
     definitions: &mut IndexMap<parse::Primitives, PrimType>,
@@ -161,7 +184,8 @@ fn gen_id() -> String {
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 'b', 'c', 'd', 'e', 'f',
     ];
 
-    nanoid!(10, &alphabet) //=> "4f90d13a42"
+    nanoid!(5, &alphabet[10..]).to_string() + &nanoid!(10, &alphabet).to_string()
+    //=> "4f90d13a42"
 }
 pub fn make_exp_seg(
     exp_type: parse::Primitives,
@@ -347,6 +371,69 @@ pub fn make_number(
     }
 }
 
+pub fn make_string(
+    tok: DescriptorToken,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
+) -> String {
+    init_str_lit(definitions);
+    format!(
+        "STR_LIT(\"{v}\")",
+        v = tok.token.string.unwrap().clone().content
+    )
+}
+
+fn make_std_fncall(
+    tok: DescriptorToken,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
+) -> String {
+    let mut arg_decls: Vec<String> = vec![];
+    let mut arg_types: Vec<String> = vec![];
+    let scope: String = gen_id();
+
+    // std::vector<std::unique_ptr<STR_LIT>>
+    for arg in tok.token.fncall.clone().unwrap().args {
+        if tok.token.fncall.clone().unwrap().name == "print" {
+            if arg.tok_type == parse::ParseType::STRING {
+                let lit = make_string(
+                    DescriptorToken {
+                        token_real_type: None,
+                        token: arg,
+                    },
+                    definitions,
+                );
+                arg_types.push(
+                    definitions
+                        .get(&parse::Primitives::STRING)
+                        .unwrap()
+                        .name
+                        .clone(),
+                );
+                let arg_lit = format!(
+                    "std::unique_ptr<STR_LIT> {name}(new {lit});\n{scope}.push_back(std::move({name}));",
+                    name = scope.clone() + "_" + &gen_id(),
+                    lit = lit,
+                    scope = scope
+                );
+                arg_decls.push(arg_lit);
+            } else {
+                unimplemented!();
+            }
+        }
+    }
+
+    if tok.token.fncall.clone().unwrap().name == "print" {
+        init_fn_io(definitions);
+        let arg_lit = format!(
+            "std::vector<std::unique_ptr<STR_LIT>> {name};",
+            name = scope.clone(),
+        );
+        let print_call = format!("PRINT(&{name});", name = scope.clone(),);
+        arg_decls.insert(0, arg_lit);
+        arg_decls.push(print_call);
+    }
+    //definitions.get(&parse::Primitives::INSCOPE("PRINT".to_string()));
+    arg_decls.join("\n")
+}
 pub fn gen(
     tok: DescriptorToken,
     scope_name: String,
@@ -363,6 +450,10 @@ pub fn gen(
         make_exp(scope_name, tok, definitions)
     } else if tok.token.tok_type == parse::ParseType::NUMBER {
         make_number(tok, definitions)
+    } else if tok.token.tok_type == parse::ParseType::FNCALL
+        && tok.token.fncall.clone().unwrap().is_std == true
+    {
+        make_std_fncall(tok.clone(), definitions)
     } else {
         unimplemented!()
     }

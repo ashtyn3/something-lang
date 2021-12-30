@@ -1,6 +1,7 @@
 use termion::color;
 pub mod generation;
 pub mod parse;
+mod som_std;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
@@ -18,6 +19,7 @@ pub enum TokenType {
     MMARK,
     COLON,
     SEMCOLON,
+    COMMA,
 
     PLUSBIN,
     SUBBIN,
@@ -242,6 +244,18 @@ impl Lexer {
                     self.read();
                 }
                 self.read();
+            } else if self.ch == ',' {
+                self.read();
+                self.tree.push(LexToken {
+                    tok_type: TokenType::COMMA,
+                    content: ",".to_string(),
+                    loc: LexTokenLoc {
+                        line_start: self.loc.line_start,
+                        col: self.loc.col,
+                        end_col: self.loc.col,
+                        line: self.loc.line,
+                    },
+                })
             } else if self.ch == '+'
                 || self.ch == '-'
                 || (self.ch == '/' && self.peek() != '/')

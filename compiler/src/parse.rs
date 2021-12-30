@@ -1,3 +1,4 @@
+use crate::som_std;
 use crate::LexToken;
 use crate::LexTokenLoc;
 use crate::TokenType;
@@ -42,6 +43,13 @@ pub struct VarInit {
     pub value_type: Primitives,
     pub name: String,
     pub value: ParseTok,
+}
+
+#[derive(Clone, Debug)]
+pub struct FnCall {
+    pub name: String,
+    pub is_std: bool,
+    pub args: Vec<ParseTok>,
 }
 
 #[derive(Clone, Debug)]
@@ -98,6 +106,7 @@ pub struct ParseTok {
     pub operand: Option<Operand>,
     pub ident: Option<Label>,
     pub variable: Box<Option<VarInit>>,
+    pub fncall: Box<Option<FnCall>>,
 }
 
 #[derive(Clone, Debug)]
@@ -390,6 +399,7 @@ impl Parser {
                 operand: None,
                 ident: None,
                 variable: Box::new(None),
+                fncall: Box::new(None),
             }
         } else {
             unimplemented!()
@@ -415,6 +425,7 @@ impl Parser {
                 operand: None,
                 ident: None,
                 variable: Box::new(None),
+                fncall: Box::new(None),
             }
         } else if self.tok.content.contains(".") && self.tok.content.starts_with("-") == true {
             ParseTok {
@@ -434,6 +445,7 @@ impl Parser {
                 operand: None,
                 ident: None,
                 variable: Box::new(None),
+                fncall: Box::new(None),
             }
         } else if self.tok.content.contains(".") == false
             && self.tok.content.starts_with("-") == true
@@ -455,6 +467,7 @@ impl Parser {
                 operand: None,
                 ident: None,
                 variable: Box::new(None),
+                fncall: Box::new(None),
             }
         } else {
             ParseTok {
@@ -474,6 +487,7 @@ impl Parser {
                 operand: None,
                 ident: None,
                 variable: Box::new(None),
+                fncall: Box::new(None),
             }
         }
     }
@@ -499,6 +513,7 @@ impl Parser {
             operand: Some(Operand { op_type }),
             ident: None,
             variable: Box::new(None),
+            fncall: Box::new(None),
         };
         return tok;
     }
@@ -530,6 +545,7 @@ impl Parser {
             expression: None,
             number: None,
             string: None,
+            fncall: Box::new(None),
             operand: None,
             variable: Box::new(None),
         }
@@ -625,6 +641,7 @@ impl Parser {
             operand: None,
             ident: None,
             variable: Box::new(None),
+            fncall: Box::new(None),
         };
     }
     pub fn parse_var_def(&mut self) -> ParseTok {
@@ -674,6 +691,7 @@ impl Parser {
             string: None,
             operand: None,
             ident: None,
+            fncall: Box::new(None),
             variable: Box::new(Some(VarInit {
                 value_type: keyword_types(var_type),
                 name: name.to_string(),
@@ -683,6 +701,82 @@ impl Parser {
         self.curr_scope.insert(name.to_string(), ret_tok.clone());
 
         return ret_tok;
+    }
+
+    pub fn parse_func_call(&mut self) -> ParseTok {
+        let start_col = self.tok.loc.col;
+        let name = self.tok.content.clone();
+        self.next_tok();
+        self.next_tok(); // consume !
+        let mut sub_tree: Vec<Vec<LexToken>> = vec![];
+        let mut temp_tree: Vec<LexToken> = vec![];
+        while self.tok.tok_type != TokenType::SEMCOLON {
+            temp_tree.push(self.tok.clone());
+            if self.tok.tok_type == TokenType::COMMA {
+                sub_tree.push(temp_tree.clone());
+                temp_tree.clear();
+            }
+            if self.peek().tok_type == TokenType::SEMCOLON {
+                sub_tree.push(temp_tree.clone());
+                temp_tree.clear();
+            }
+            self.next_tok();
+        }
+        let mut args: Vec<ParseTok> = vec![];
+        for arg in sub_tree {
+            let mut parsed_arg = Parser::new(arg, self.file.to_owned(), self.curr_scope.to_owned());
+            args.push(parsed_arg.parse());
+        }
+        let mut fn_call = FnCall {
+            args,
+            is_std: false,
+            name: name.to_string(),
+        };
+        let mut call = ParseTok {
+            tok_type: ParseType::FNCALL,
+            location: ParseLoc {
+                start_col,
+                end_col: self.tok.loc.end_col,
+                line: self.tok.loc.line,
+            },
+            expression: None,
+            number: None,
+            string: None,
+            operand: None,
+            ident: None,
+            variable: Box::new(None),
+            fncall: Box::new(Some(fn_call)),
+        };
+        call.fncall = Box::new(call.fncall.clone().map(|mut s| {
+            s.is_std = som_std::is_std_fn(&mut call);
+            s
+        }));
+        self.next_tok();
+        if call.fncall.clone().unwrap().is_std == false {
+            //TODO: check parameter types and if function exists for non standard library function.
+            unimplemented!()
+        }
+        call
+    }
+    pub fn parse_string(&mut self) -> ParseTok {
+        ParseTok {
+            tok_type: ParseType::STRING,
+            location: ParseLoc {
+                start_col: self.tok.loc.col,
+                end_col: self.tok.loc.end_col,
+                line: self.tok.loc.line,
+            },
+            expression: None,
+            number: None,
+            string: Some(StringT {
+                content: self.tok.content.replace("\"", ""),
+                length: self.tok.content.replace("\"", "").len(),
+            }),
+            operand: None,
+            ident: None,
+            variable: Box::new(None),
+            fncall: Box::new(None),
+        }
     }
 
     pub fn tree(self) -> Vec<ParseTok> {
@@ -704,6 +798,9 @@ impl Parser {
             || self.tok.tok_type == TokenType::NEGNUMBER
         {
             self.parse_int()
+        } else if self.tok.tok_type == TokenType::LABEL && self.peek().tok_type == TokenType::MMARK
+        {
+            self.parse_func_call()
         } else if self.tok.tok_type == TokenType::LABEL {
             self.parse_ident()
         } else if self.tok.tok_type == TokenType::PLUSBIN
@@ -713,6 +810,8 @@ impl Parser {
             || self.tok.tok_type == TokenType::COLON
         {
             self.parse_operand()
+        } else if self.tok.tok_type == TokenType::STRING {
+            self.parse_string()
         } else {
             println!(
                 "Unknown parser token ({line},{col}): {}",
