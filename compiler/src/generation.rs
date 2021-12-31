@@ -397,6 +397,7 @@ fn make_std_fncall(
     parent_scope: Option<String>,
     definitions: &mut IndexMap<parse::Primitives, PrimType>,
 ) -> String {
+    init_str_lit(definitions);
     let mut arg_decls: Vec<String> = vec![];
     let mut arg_types: Vec<String> = vec![];
     let scope: String = gen_id();
@@ -442,6 +443,21 @@ fn make_std_fncall(
                     scope = scope
                 );
                 arg_decls.push(arg_lit);
+            } else if arg.tok_type == parse::ParseType::LABEL {
+                let lit = make_ident(
+                    DescriptorToken {
+                        token_real_type: None,
+                        token: arg,
+                    },
+                    definitions,
+                );
+                let arg_lit = format!(
+                    "std::unique_ptr<STR_LIT> {name}(new STR_LIT({lit}.display()));\n{scope}.push_back(std::move({name}));",
+                    name = scope.clone() + "_" + &gen_id(),
+                    lit = lit,
+                    scope = scope
+                );
+                arg_decls.push(arg_lit);
             } else {
                 unimplemented!();
             }
@@ -465,6 +481,16 @@ fn make_std_fncall(
     //definitions.get(&parse::Primitives::INSCOPE("PRINT".to_string()));
     arg_decls.join("\n")
 }
+
+fn make_ident(
+    tok: DescriptorToken,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
+) -> String {
+    let lit = tok.token.ident.unwrap();
+    init_lib(definitions, lit.var_type);
+    format!("(*{name})", name = lit.name)
+}
+
 pub fn gen(
     tok: DescriptorToken,
     scope_name: String,
@@ -485,6 +511,8 @@ pub fn gen(
         && tok.token.fncall.clone().unwrap().is_std == true
     {
         make_std_fncall(tok.clone(), Some(scope_name), definitions)
+    } else if tok.token.tok_type == parse::ParseType::LABEL {
+        make_ident(tok.clone(), definitions)
     } else {
         unimplemented!()
     }
