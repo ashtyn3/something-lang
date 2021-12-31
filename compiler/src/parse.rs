@@ -695,9 +695,19 @@ impl Parser {
             variable: Box::new(Some(VarInit {
                 value_type: keyword_types(var_type),
                 name: name.to_string(),
-                value: body,
+                value: body.clone(),
             })),
         };
+        if body.clone().tok_type == ParseType::FNCALL
+            && body.clone().fncall.unwrap().name == "print"
+        {
+            println!(
+                "Unexpected tokens ({line}:{col}): Cannot assign print function call as variable.",
+                line = self.tok.loc.line,
+                col = self.tok.loc.col
+            );
+            std::process::exit(1);
+        }
         self.curr_scope.insert(name.to_string(), ret_tok.clone());
 
         return ret_tok;
@@ -710,7 +720,7 @@ impl Parser {
         self.next_tok(); // consume !
         let mut sub_tree: Vec<Vec<LexToken>> = vec![];
         let mut temp_tree: Vec<LexToken> = vec![];
-        while self.tok.tok_type != TokenType::SEMCOLON {
+        while self.tok.tok_type != TokenType::SEMCOLON && self.tok.tok_type != TokenType::EOF {
             temp_tree.push(self.tok.clone());
             if self.tok.tok_type == TokenType::COMMA {
                 sub_tree.push(temp_tree.clone());
@@ -727,7 +737,7 @@ impl Parser {
             let mut parsed_arg = Parser::new(arg, self.file.to_owned(), self.curr_scope.to_owned());
             args.push(parsed_arg.parse());
         }
-        let mut fn_call = FnCall {
+        let fn_call = FnCall {
             args,
             is_std: false,
             name: name.to_string(),

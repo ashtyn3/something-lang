@@ -56,7 +56,7 @@ pub fn init_int_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>, siz
                 + &size
                 + "_LIT {\nint_fast"
                 + &size
-                + "_t num;\nINT"
+                + "_t num;\nstd::string display() { return std::to_string(num); };\nINT"
                 + &size
                 + "_LIT(int_fast"
                 + &size
@@ -140,22 +140,23 @@ fn init_lib(definitions: &mut IndexMap<parse::Primitives, PrimType>, tok_type: p
 
 pub fn init_fn_io(definitions: &mut IndexMap<parse::Primitives, PrimType>) {
     definitions.insert(
-        parse::Primitives::INSCOPE("PRINT".to_string()),
+        parse::Primitives::INSCOPE("print".to_string()),
         PrimType {
             def: format!(
                 "
 #include <cstdio>
 #include <vector>
-void PRINT(std::vector<std::unique_ptr<STR_LIT>>* ARGS) {{
+int print(std::vector<std::unique_ptr<STR_LIT>>* ARGS) {{
   for (int i = 0; i < ARGS->size(); i++) {{
     STR_LIT t = *ARGS->at(i);
     printf(\"%s\", t.chs.c_str());
   }}
+  return 0;
 }}
                 "
             )
             .to_string(),
-            name: "PRINT".to_string(),
+            name: "print".to_string(),
         },
     );
 }
@@ -168,7 +169,16 @@ pub fn make_var_def(
     value: DescriptorToken,
 ) -> String {
     init_lib(definitions, var_type.clone());
-    let type_ = definitions[&var_type].name.clone();
+    let type_: String;
+    if definitions.get(&var_type).is_none() {
+        type_ = "int".to_string();
+        println!(
+            "Warning: Unknown return type for variable {name}.",
+            name = &name
+        )
+    } else {
+        type_ = definitions[&var_type].name.clone();
+    }
 
     let mut base = vec![format!("std::unique_ptr<{}> {};", type_, name)];
     base.push(gen(value, name, definitions));
@@ -384,6 +394,7 @@ pub fn make_string(
 
 fn make_std_fncall(
     tok: DescriptorToken,
+    parent_scope: Option<String>,
     definitions: &mut IndexMap<parse::Primitives, PrimType>,
 ) -> String {
     let mut arg_decls: Vec<String> = vec![];
@@ -415,6 +426,22 @@ fn make_std_fncall(
                     scope = scope
                 );
                 arg_decls.push(arg_lit);
+            } else if arg.tok_type == parse::ParseType::NUMBER {
+                let lit = make_number(
+                    DescriptorToken {
+                        token_real_type: None,
+                        token: arg,
+                    },
+                    definitions,
+                );
+
+                let arg_lit = format!(
+                    "std::unique_ptr<STR_LIT> {name}(new STR_LIT({lit}.display()));\n{scope}.push_back(std::move({name}));",
+                    name = scope.clone() + "_" + &gen_id(),
+                    lit = lit,
+                    scope = scope
+                );
+                arg_decls.push(arg_lit);
             } else {
                 unimplemented!();
             }
@@ -427,10 +454,14 @@ fn make_std_fncall(
             "std::vector<std::unique_ptr<STR_LIT>> {name};",
             name = scope.clone(),
         );
-        let print_call = format!("PRINT(&{name});", name = scope.clone(),);
         arg_decls.insert(0, arg_lit);
-        arg_decls.push(print_call);
     }
+    let print_call = format!(
+        "{fnName}(&{name});",
+        name = scope.clone(),
+        fnName = tok.token.fncall.unwrap().name
+    );
+    arg_decls.push(print_call);
     //definitions.get(&parse::Primitives::INSCOPE("PRINT".to_string()));
     arg_decls.join("\n")
 }
@@ -453,7 +484,7 @@ pub fn gen(
     } else if tok.token.tok_type == parse::ParseType::FNCALL
         && tok.token.fncall.clone().unwrap().is_std == true
     {
-        make_std_fncall(tok.clone(), definitions)
+        make_std_fncall(tok.clone(), Some(scope_name), definitions)
     } else {
         unimplemented!()
     }
