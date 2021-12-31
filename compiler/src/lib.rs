@@ -103,7 +103,7 @@ impl Lexer {
 
     pub fn lex(&mut self) {
         loop {
-            if self.ch.is_whitespace() {
+            if self.ch.is_whitespace() && self.ch != '\n' {
                 self.read()
             } else if self.ch.is_alphabetic() {
                 let start_col = self.loc.col;
@@ -318,8 +318,9 @@ impl Lexer {
                 }
                 self.read();
             } else if self.ch == '\n' {
+                self.loc.line_start = self.loc.col + 1;
+                self.loc.line += 1;
                 self.read();
-                self.loc.line_start = self.loc.col + 1
             } else if self.ch == char::from(0) {
                 break;
             } else {

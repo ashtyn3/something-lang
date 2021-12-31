@@ -1,4 +1,5 @@
 hi:f32: (1.0+2.0*3.0);
-wow:str: "wow";
 
 print! wow, "\n";
+
+wow:str: "wow";
