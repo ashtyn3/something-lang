@@ -58,7 +58,7 @@ fn main() {
         parser.init();
         let mut main_buffer: Vec<String> = vec![String::from("int main() {")];
         let def = &mut IndexMap::new();
-        for tok in parser.tree() {
+        for tok in parser.clone().tree() {
             let gen = compiler::generation::gen(
                 compiler::generation::DescriptorToken {
                     token_real_type: None,
@@ -70,6 +70,7 @@ fn main() {
             main_buffer.push(gen);
         }
         main_buffer.push(String::from("return 0;\n}"));
+        println!("{:#?}", parser.tree());
         let mut defs: Vec<String> = def
             .values()
             .map(|item| -> String { item.def.clone() })

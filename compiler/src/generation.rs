@@ -135,6 +135,8 @@ fn init_lib(definitions: &mut IndexMap<parse::Primitives, PrimType>, tok_type: p
         let variant = prim_var_str(tok_type);
         init_float_lit(definitions, variant[1].clone());
         init_fn_math(definitions, variant[1].clone(), variant[0].clone());
+    } else if parse::prim_eq(&tok_type, &parse::Primitives::STRING) {
+        init_str_lit(definitions);
     }
 }
 
@@ -383,13 +385,22 @@ pub fn make_number(
 
 pub fn make_string(
     tok: DescriptorToken,
+    scope_name: String,
     definitions: &mut IndexMap<parse::Primitives, PrimType>,
 ) -> String {
     init_str_lit(definitions);
-    format!(
-        "STR_LIT(\"{v}\")",
-        v = tok.token.string.unwrap().clone().content
-    )
+    if scope_name == "_" {
+        format!(
+            "STR_LIT(\"{v}\")",
+            v = tok.token.string.unwrap().clone().content
+        )
+    } else {
+        format!(
+            "{name} = std::make_unique<STR_LIT>(STR_LIT(\"{v}\"));",
+            v = tok.token.string.unwrap().clone().content,
+            name = scope_name
+        )
+    }
 }
 
 fn make_std_fncall(
@@ -411,6 +422,7 @@ fn make_std_fncall(
                         token_real_type: None,
                         token: arg,
                     },
+                    String::from("_"),
                     definitions,
                 );
                 arg_types.push(
@@ -540,7 +552,7 @@ pub fn gen(
     } else if tok.token.tok_type == parse::ParseType::LABEL {
         make_ident(tok.clone(), definitions)
     } else if tok.token.tok_type == parse::ParseType::STRING {
-        make_string(tok.clone(), definitions)
+        make_string(tok.clone(), scope_name, definitions)
     } else {
         unimplemented!()
     }
