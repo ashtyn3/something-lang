@@ -458,6 +458,32 @@ fn make_std_fncall(
                     scope = scope
                 );
                 arg_decls.push(arg_lit);
+            } else if arg.tok_type == parse::ParseType::EXP {
+                let sub_var = scope.clone() + "_" + &gen_id();
+                let type_ = arg.expression.clone().unwrap().exp_type;
+                init_lib(definitions, type_.clone());
+
+                let str_type = definitions.get(&type_).unwrap().name.clone();
+                let mut base = vec![format!("std::unique_ptr<{}> {};", str_type, sub_var)];
+
+                let lit = make_exp(
+                    sub_var.clone(),
+                    DescriptorToken {
+                        token_real_type: None,
+                        token: arg,
+                    },
+                    definitions,
+                );
+                base.push(lit);
+
+                let arg_lit = format!(
+                    "std::unique_ptr<STR_LIT> {name}(new STR_LIT({v}.display()));\n{scope}.push_back(std::move({name}));",
+                    name=sub_var.clone()+"_"+&gen_id(),
+                    scope = scope,
+                    v = format!("(*{name})", name = &sub_var)
+                );
+                arg_decls.append(&mut base);
+                arg_decls.push(arg_lit);
             } else {
                 unimplemented!();
             }
@@ -513,6 +539,8 @@ pub fn gen(
         make_std_fncall(tok.clone(), Some(scope_name), definitions)
     } else if tok.token.tok_type == parse::ParseType::LABEL {
         make_ident(tok.clone(), definitions)
+    } else if tok.token.tok_type == parse::ParseType::STRING {
+        make_string(tok.clone(), definitions)
     } else {
         unimplemented!()
     }
