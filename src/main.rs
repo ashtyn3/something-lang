@@ -70,7 +70,6 @@ fn main() {
             main_buffer.push(gen);
         }
         main_buffer.push(String::from("return 0;\n}"));
-        println!("{:#?}", parser.tree());
         let mut defs: Vec<String> = def
             .values()
             .map(|item| -> String { item.def.clone() })
