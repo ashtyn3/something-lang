@@ -52,7 +52,7 @@ pub fn init_int_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>, siz
     definitions.insert(
         parse::Primitives::INT(size.parse::<i8>().unwrap()),
         PrimType {
-            def: "\nstruct INT".to_owned()
+            def: "#include<string>\nstruct INT".to_owned()
                 + &size
                 + "_LIT {\nint_fast"
                 + &size
@@ -529,6 +529,65 @@ fn make_ident(
     format!("(*{name})", name = lit.name)
 }
 
+fn make_func(
+    tok: DescriptorToken,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
+) -> String {
+    if definitions
+        .get(&tok.token.clone().fnmake.unwrap().return_type)
+        .is_none()
+    {
+        init_lib(definitions, tok.token.clone().fnmake.unwrap().return_type)
+    }
+    let mut param_decls = vec![];
+    for param in tok.token.clone().fnmake.unwrap().params {
+        if definitions.get(&param.value_type).is_none() {
+            init_lib(definitions, param.clone().value_type)
+        }
+        let type_name = &definitions.get(&param.value_type).unwrap().clone().name;
+        let param_prop = format!(
+            "std::unique_ptr<{TYPE}> {name};\n",
+            TYPE = type_name,
+            name = param.name
+        );
+        param_decls.push(param_prop);
+    }
+    let mut body: Vec<String> = vec![];
+    for line in tok.token.clone().fnmake.unwrap().body {
+        let statement = gen(
+            DescriptorToken {
+                token: line,
+                token_real_type: None,
+            },
+            "_".to_string(),
+            definitions,
+        );
+        body.push(statement);
+    }
+    format!(
+        "
+    struct {name} {{
+        {ret_type} RETURN;
+        {params}
+        void body() {{
+            {body}
+        }}
+        int call() {{
+            body();
+            return 0;
+        }}
+    }};
+        ",
+        name = tok.token.fnmake.clone().unwrap().name,
+        ret_type = definitions
+            .get(&tok.token.fnmake.clone().unwrap().return_type)
+            .unwrap()
+            .name,
+        params = param_decls.join(""),
+        body = body.join("\n"),
+    )
+}
+
 pub fn gen(
     tok: DescriptorToken,
     scope_name: String,
@@ -538,7 +597,7 @@ pub fn gen(
         let var = tok.token.variable.clone().unwrap();
         let value = DescriptorToken {
             token_real_type: Some(tok.token.variable.unwrap().value_type),
-            token: var.value.clone(),
+            token: var.value.unwrap().clone(),
         };
         make_var_def(scope_name, definitions, var.name, var.value_type, value)
     } else if tok.token.tok_type == parse::ParseType::EXP {
@@ -553,6 +612,8 @@ pub fn gen(
         make_ident(tok.clone(), definitions)
     } else if tok.token.tok_type == parse::ParseType::STRING {
         make_string(tok.clone(), scope_name, definitions)
+    } else if tok.token.tok_type == parse::ParseType::FNMAKE {
+        make_func(tok, definitions)
     } else {
         unimplemented!()
     }
