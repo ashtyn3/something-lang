@@ -12,6 +12,7 @@ pub enum TokenType {
 
     // program types
     EOF,
+    KEYWORD,
 
     // operator types
     LPAREN,
@@ -103,7 +104,7 @@ impl Lexer {
 
     pub fn lex(&mut self) {
         loop {
-            if self.ch.is_whitespace() && self.ch != '\n' {
+            if self.ch.is_whitespace() && self.ch != '\n' && self.ch != '\t' {
                 self.read()
             } else if self.ch.is_alphabetic() {
                 let start_col = self.loc.col;
@@ -116,16 +117,29 @@ impl Lexer {
                 }
 
                 self.read();
-                self.tree.push(LexToken {
-                    tok_type: TokenType::LABEL,
-                    content: name,
-                    loc: LexTokenLoc {
-                        line_start: self.loc.line_start,
-                        col: start_col,
-                        end_col: self.loc.col,
-                        line: self.loc.line,
-                    },
-                })
+                match name.as_str() {
+                    "end" => self.tree.push(LexToken {
+                        tok_type: TokenType::KEYWORD,
+                        content: name,
+                        loc: LexTokenLoc {
+                            line_start: self.loc.line_start,
+                            col: start_col,
+                            end_col: self.loc.col,
+                            line: self.loc.line,
+                        },
+                    }),
+
+                    _ => self.tree.push(LexToken {
+                        tok_type: TokenType::LABEL,
+                        content: name,
+                        loc: LexTokenLoc {
+                            line_start: self.loc.line_start,
+                            col: start_col,
+                            end_col: self.loc.col,
+                            line: self.loc.line,
+                        },
+                    }),
+                }
             } else if self.ch == '"' {
                 let start_col = self.loc.col;
                 self.read(); // consume starting "
