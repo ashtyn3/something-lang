@@ -13,6 +13,7 @@ pub enum ParseType {
     STRING,
     FNCALL,
     FNMAKE,
+    FNPARAM,
     LABEL,
     VARDEF,
 }
@@ -42,7 +43,16 @@ pub enum BinOperand {
 pub struct VarInit {
     pub value_type: Primitives,
     pub name: String,
-    pub value: ParseTok,
+    pub value: Option<ParseTok>,
+}
+
+#[derive(Clone, Debug)]
+pub struct FuncDef {
+    pub return_type: Primitives,
+    pub name: String,
+    pub body: Vec<ParseTok>,
+    pub params: Vec<VarInit>,
+    pub is_std: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -107,6 +117,7 @@ pub struct ParseTok {
     pub ident: Option<Label>,
     pub variable: Box<Option<VarInit>>,
     pub fncall: Box<Option<FnCall>>,
+    pub fnmake: Box<Option<FuncDef>>,
 }
 
 #[derive(Clone, Debug)]
@@ -182,6 +193,7 @@ pub fn keyword_types(prim: Primitives) -> Primitives {
         prim
     }
 }
+
 fn get_prim(tok: ParseTok) -> Primitives {
     match tok.tok_type {
         ParseType::NUMBER => tok.number.unwrap().num_type,
@@ -209,7 +221,7 @@ fn get_prim(tok: ParseTok) -> Primitives {
             {
                 Primitives::STRING
             } else {
-                unimplemented!()
+                tok.ident.unwrap().var_type
             }
         }
 
@@ -235,6 +247,7 @@ impl Parser {
             curr_scope: scope,
         }
     }
+
     pub fn next_tok(&mut self) {
         self.lex_id += 1;
         if self.lex_id >= self.lex_tree.len() {
@@ -322,7 +335,6 @@ impl Parser {
                         stack.push(op_stack.pop().unwrap());
                     }
                     if op_stack.len() == 0 {
-                        //TODO: Add error for mismatched parens.
                         break;
                     }
                 }
@@ -400,6 +412,7 @@ impl Parser {
                 ident: None,
                 variable: Box::new(None),
                 fncall: Box::new(None),
+                fnmake: Box::new(None),
             }
         } else {
             unimplemented!()
@@ -426,6 +439,7 @@ impl Parser {
                 ident: None,
                 variable: Box::new(None),
                 fncall: Box::new(None),
+                fnmake: Box::new(None),
             }
         } else if self.tok.content.contains(".") && self.tok.content.starts_with("-") == true {
             ParseTok {
@@ -446,6 +460,7 @@ impl Parser {
                 ident: None,
                 variable: Box::new(None),
                 fncall: Box::new(None),
+                fnmake: Box::new(None),
             }
         } else if self.tok.content.contains(".") == false
             && self.tok.content.starts_with("-") == true
@@ -468,6 +483,7 @@ impl Parser {
                 ident: None,
                 variable: Box::new(None),
                 fncall: Box::new(None),
+                fnmake: Box::new(None),
             }
         } else {
             ParseTok {
@@ -488,6 +504,7 @@ impl Parser {
                 ident: None,
                 variable: Box::new(None),
                 fncall: Box::new(None),
+                fnmake: Box::new(None),
             }
         }
     }
@@ -514,6 +531,7 @@ impl Parser {
             ident: None,
             variable: Box::new(None),
             fncall: Box::new(None),
+            fnmake: Box::new(None),
         };
         return tok;
     }
@@ -548,6 +566,7 @@ impl Parser {
             fncall: Box::new(None),
             operand: None,
             variable: Box::new(None),
+            fnmake: Box::new(None),
         }
     }
 
@@ -573,6 +592,8 @@ impl Parser {
                     exp_prim_type = parse_out.clone().number.unwrap().num_type;
                 } else if whole_type == ParseType::STRING {
                     exp_prim_type = Primitives::STRING;
+                } else if whole_type == ParseType::LABEL {
+                    exp_prim_type = parse_out.ident.clone().unwrap().var_type;
                 }
             }
 
@@ -642,6 +663,7 @@ impl Parser {
             ident: None,
             variable: Box::new(None),
             fncall: Box::new(None),
+            fnmake: Box::new(None),
         };
     }
     pub fn parse_var_def(&mut self) -> ParseTok {
@@ -695,8 +717,9 @@ impl Parser {
             variable: Box::new(Some(VarInit {
                 value_type: keyword_types(var_type),
                 name: name.to_string(),
-                value: body.clone(),
+                value: Some(body.clone()),
             })),
+            fnmake: Box::new(None),
         };
         if body.clone().tok_type == ParseType::FNCALL
             && body.clone().fncall.unwrap().name == "print"
@@ -756,6 +779,7 @@ impl Parser {
             ident: None,
             variable: Box::new(None),
             fncall: Box::new(Some(fn_call)),
+            fnmake: Box::new(None),
         };
         call.fncall = Box::new(call.fncall.clone().map(|mut s| {
             s.is_std = som_std::is_std_fn(&mut call);
@@ -786,7 +810,127 @@ impl Parser {
             ident: None,
             variable: Box::new(None),
             fncall: Box::new(None),
+            fnmake: Box::new(None),
         }
+    }
+    pub fn parse_func_def(&mut self) -> ParseTok {
+        let name = self.tok.content.clone();
+        let mut params = vec![];
+        let mut count = 0;
+        let mut temp = VarInit {
+            name: String::from(""),
+            value_type: Primitives::INSCOPE(String::from("void")),
+            value: None,
+        };
+        self.next_tok();
+        while self.tok.tok_type != TokenType::COLON {
+            if count == 0 && self.tok.content != "," {
+                temp.name = self.tok.clone().content;
+            } else if count == 1 && self.tok.content != "," {
+                temp.value_type =
+                    keyword_types(Primitives::INSCOPE(String::from(self.tok.clone().content)));
+            } else if self.tok.tok_type == TokenType::COMMA {
+                params.push(temp.clone());
+                count = 0;
+                self.next_tok();
+                continue;
+            }
+            if self.peek().tok_type == TokenType::COLON {
+                params.push(temp.clone());
+                count = 0;
+                self.next_tok();
+                continue;
+            }
+            self.next_tok();
+            count += 1;
+        }
+        self.next_tok(); // consume :
+        let ret_type = keyword_types(Primitives::INSCOPE(String::from(self.tok.content.clone())));
+        self.curr_scope.insert(
+            name.clone(),
+            ParseTok {
+                tok_type: ParseType::FNMAKE,
+                location: ParseLoc {
+                    line: self.tok.loc.line,
+                    start_col: self.tok.loc.col,
+                    end_col: self.tok.loc.end_col,
+                },
+                expression: None,
+                number: None,
+                string: None,
+                operand: None,
+                ident: None,
+                variable: Box::new(None),
+                fncall: Box::new(None),
+                fnmake: Box::new(Some(FuncDef {
+                    return_type: ret_type.clone(),
+                    name: name.clone(),
+                    params: params.clone(),
+                    is_std: false,
+                    body: vec![],
+                })),
+            },
+        );
+        let mut func_scope = self.curr_scope.clone();
+
+        for param in &params {
+            func_scope.insert(
+                param.clone().name,
+                ParseTok {
+                    tok_type: ParseType::FNPARAM,
+                    location: ParseLoc {
+                        start_col: self.tok.loc.col,
+                        end_col: self.tok.loc.end_col,
+                        line: self.tok.loc.line,
+                    },
+                    expression: None,
+                    number: None,
+                    string: None,
+                    operand: None,
+                    ident: None,
+                    variable: Box::new(Some(param.clone())),
+                    fncall: Box::new(None),
+                    fnmake: Box::new(None),
+                },
+            );
+        }
+
+        let mut sub_tree: Vec<LexToken> = vec![];
+        self.next_tok();
+
+        while self.tok.content != "end" {
+            sub_tree.push(self.tok.clone());
+            self.next_tok()
+        }
+        self.next_tok(); // consume end keyword
+
+        let mut body = Parser::new(sub_tree, self.file.clone(), func_scope);
+        body.init();
+
+        let tok = ParseTok {
+            tok_type: ParseType::FNMAKE,
+            location: ParseLoc {
+                start_col: self.tok.loc.col,
+                end_col: self.tok.loc.end_col,
+                line: self.tok.loc.line,
+            },
+            expression: None,
+            number: None,
+            string: None,
+            operand: None,
+            ident: None,
+            variable: Box::new(None),
+            fncall: Box::new(None),
+            fnmake: Box::new(Some(FuncDef {
+                name: name.clone(),
+                params,
+                return_type: ret_type,
+                body: body.tree(),
+                is_std: false,
+            })),
+        };
+        self.curr_scope.insert(name.clone(), tok.clone());
+        tok
     }
 
     pub fn tree(self) -> Vec<ParseTok> {
@@ -811,6 +955,9 @@ impl Parser {
         } else if self.tok.tok_type == TokenType::LABEL && self.peek().tok_type == TokenType::MMARK
         {
             self.parse_func_call()
+        } else if self.tok.tok_type == TokenType::LABEL && self.peek().tok_type == TokenType::LABEL
+        {
+            self.parse_func_def()
         } else if self.tok.tok_type == TokenType::LABEL {
             self.parse_ident()
         } else if self.tok.tok_type == TokenType::PLUSBIN
