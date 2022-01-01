@@ -199,6 +199,7 @@ fn get_prim(tok: ParseTok) -> Primitives {
         ParseType::NUMBER => tok.number.unwrap().num_type,
         ParseType::STRING => Primitives::STRING,
         ParseType::OPERATOR => Primitives::OPERATOR,
+        ParseType::EXP => tok.expression.unwrap().exp_type,
         ParseType::LABEL => {
             if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i8".to_string()) {
                 Primitives::INT(8)
@@ -683,8 +684,8 @@ impl Parser {
         let var_type = Primitives::INSCOPE(self.tok.content.clone());
         if self.peek().tok_type != TokenType::COLON {
             println!(
-                "Unknown parser token ({line}:{col}): Expected token of type LABEL instead got {:?}",
-                self.peek().tok_type,
+                "Unknown parser token ({line}:{col}): Expected token : instead got {:?}",
+                self.peek().content,
                 line = self.tok.loc.line,
                 col = self.tok.loc.col
             );
@@ -699,6 +700,17 @@ impl Parser {
             self.next_tok()
         }
         let body = Parser::new(sub_tree, self.file.clone(), self.curr_scope.clone()).parse();
+
+        if get_prim(body.clone()) != keyword_types(var_type.clone()) {
+            println!(
+                "Bad Types ({line}:{col}): Cannot assign type of {:?} with type {:?}",
+                get_prim(body.clone()),
+                keyword_types(var_type),
+                line = self.tok.loc.line,
+                col = self.tok.loc.col
+            );
+            std::process::exit(1);
+        }
 
         self.next_tok();
         let ret_tok = ParseTok {
@@ -756,12 +768,16 @@ impl Parser {
             self.next_tok();
         }
         let mut args: Vec<ParseTok> = vec![];
-        for arg in sub_tree {
-            let mut parsed_arg = Parser::new(arg, self.file.to_owned(), self.curr_scope.to_owned());
+        for arg in &sub_tree {
+            let mut parsed_arg = Parser::new(
+                arg.to_vec(),
+                self.file.to_owned(),
+                self.curr_scope.to_owned(),
+            );
             args.push(parsed_arg.parse());
         }
         let fn_call = FnCall {
-            args,
+            args: args.clone(),
             is_std: false,
             name: name.to_string(),
         };
@@ -788,7 +804,55 @@ impl Parser {
         self.next_tok();
         if call.fncall.clone().unwrap().is_std == false {
             //TODO: check parameter types and if function exists for non standard library function.
-            unimplemented!()
+            if self.curr_scope.get(&name.to_string()).is_none() {
+                println!(
+                    "Undeclared function ({line}:{col}): Cannot call function {}",
+                    self.tok.content,
+                    line = self.tok.loc.line,
+                    col = self.tok.loc.col
+                );
+                std::process::exit(1)
+            }
+            let func = self
+                .curr_scope
+                .get(&name.to_string())
+                .unwrap()
+                .fnmake
+                .clone()
+                .unwrap();
+            if func.params.len() > sub_tree.clone().len() {
+                println!("Missing argument ({line}:{col}) Function call of {name} missing argument {arg}",
+                name=name,
+                arg=func.params.last().unwrap().clone().name,
+                line = self.tok.loc.line,
+                col = self.tok.loc.col
+                )
+            }
+            if func.params.len() < sub_tree.clone().len() {
+                println!("Too many arguments ({line}:{col}) Function call of {name} expected {len} arguments",
+                name=name,
+                len=func.params.len(),
+                line = self.tok.loc.line,
+                col = self.tok.loc.col
+                )
+            }
+            for parent_arg in func.params {
+                let mut arg: Option<ParseTok> = None;
+                for sup_arg in args.clone() {
+                    arg = Some(sup_arg.clone());
+                }
+                if let Some(a) = arg {
+                    if parent_arg.value_type != get_prim(a.to_owned()) {
+                        println!("Bad types ({line}:{col}): Argument {name} of type {:?} cannot be assigned to type {:?}",
+                        parent_arg.value_type,
+                        get_prim(a.clone()),
+                        name=parent_arg.name,
+                        line = self.tok.loc.line,
+                        col = self.tok.loc.col
+                    );
+                    }
+                }
+            }
         }
         call
     }
