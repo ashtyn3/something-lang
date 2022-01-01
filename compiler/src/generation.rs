@@ -12,6 +12,7 @@ pub struct Function {
 pub struct PrimType {
     pub def: String,
     pub name: String,
+    pub raw: Option<parse::ParseTok>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +45,7 @@ struct STR_LIT {
             "
             .to_string(),
             name: String::from("STR_LIT"),
+            raw: None,
         },
     );
 }
@@ -62,6 +64,7 @@ pub fn init_int_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>, siz
                 + &size
                 + "_t i) : num(i){};\n};",
             name: String::from("INT".to_owned() + &size + "_LIT"),
+            raw: None,
         },
     );
 }
@@ -77,6 +80,7 @@ pub fn init_float_lit(definitions: &mut IndexMap<parse::Primitives, PrimType>, s
                     + &size
                     + "_LIT(float f) : num(f){};\n};",
                 name: String::from("FLOAT".to_owned() + &size + "_LIT"),
+            raw: None,
             },
         );
     }
@@ -95,6 +99,7 @@ pub fn init_fn_math(
                 "{TYPE}{size}_LIT {TYPE}{size}_PLUS({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num + y.num;}};", size=size, TYPE=type_
                  ),
             name: String::from(type_.clone()+ &size + "_LIT"),
+            raw: None,
         },
     );
     definitions.insert(
@@ -104,6 +109,7 @@ pub fn init_fn_math(
                 "{TYPE}{size}_LIT {TYPE}{size}_SUB({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num - y.num;}};", size=size, TYPE=type_
             ),
             name: String::from(type_.clone()+ &size + "_LIT"),
+            raw: None,
         },
     );
     definitions.insert(
@@ -113,6 +119,7 @@ pub fn init_fn_math(
                 "{TYPE}{size}_LIT {TYPE}{size}_MUL({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num * y.num;}};", size=size, TYPE=type_
             ),
             name: String::from(type_.clone()+ &size + "_LIT"),
+            raw: None,
         },
     );
     definitions.insert(
@@ -122,6 +129,7 @@ pub fn init_fn_math(
                 "{TYPE}{size}_LIT {TYPE}{size}_DIV({TYPE}{size}_LIT x, {TYPE}{size}_LIT y) {{\nreturn x.num / y.num;}};", size=size, TYPE=type_
             ),
             name: String::from(type_.clone()+ &size + "_LIT"),
+            raw: None,
         },
     );
 }
@@ -159,6 +167,7 @@ int print(std::vector<std::unique_ptr<STR_LIT>>* ARGS) {{
             )
             .to_string(),
             name: "print".to_string(),
+            raw: None,
         },
     );
 }
@@ -564,10 +573,10 @@ fn make_func(
         );
         body.push(statement);
     }
-    format!(
+    let func = format!(
         "
     struct {name} {{
-        {ret_type} RETURN;
+        std::unique_ptr<{ret_type}> RETURN;
         {params}
         void body() {{
             {body}
@@ -585,7 +594,68 @@ fn make_func(
             .name,
         params = param_decls.join(""),
         body = body.join("\n"),
-    )
+    );
+    definitions.insert(
+        parse::Primitives::INSCOPE(tok.token.fnmake.clone().unwrap().name),
+        PrimType {
+            def: func,
+            name: tok.token.fnmake.clone().unwrap().name,
+            raw: Some(tok.token),
+        },
+    );
+    "".to_string()
+}
+pub fn make_fncall(
+    tok: DescriptorToken,
+    scope_name: Option<String>,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
+) -> String {
+    let id = gen_id();
+    let name = tok.token.fncall.clone().unwrap().name;
+    let mut params = vec![];
+    let def = &mut definitions
+        .get(&parse::Primitives::INSCOPE(name.clone().to_string()))
+        .unwrap()
+        .raw
+        .clone();
+    let arg_list = &def.clone().unwrap().fnmake.unwrap().params;
+    for (i, sup_arg) in tok.token.fncall.unwrap().args.iter().enumerate() {
+        let val = gen(
+            DescriptorToken {
+                token_real_type: None,
+                token: sup_arg.clone(),
+            },
+            scope_name.clone().unwrap_or(String::from("_")),
+            definitions,
+        );
+        let arg = &arg_list[i];
+        let name = &arg.name;
+        let type_str = &definitions.get(&arg.value_type).unwrap().name;
+        params.push(format!(
+            "{id}.{name} = std::make_unique<{TYPE}>({val});",
+            id = id,
+            TYPE = type_str,
+            val = val,
+            name = name
+        ))
+    }
+    let mut decls: Vec<String> = vec![];
+    let base = format!(
+        "{name} {id};
+        {args}\n{id}.call();",
+        name = name,
+        id = id,
+        args = params.join("\n")
+    );
+    decls.push(base.clone());
+    if scope_name.is_some() && scope_name.clone().unwrap() != "_" {
+        decls.push(format!(
+            "{name} = *{id}->RETURN",
+            name = scope_name.unwrap(),
+            id = id
+        ));
+    }
+    decls.join("\n")
 }
 
 pub fn gen(
@@ -608,6 +678,8 @@ pub fn gen(
         && tok.token.fncall.clone().unwrap().is_std == true
     {
         make_std_fncall(tok.clone(), Some(scope_name), definitions)
+    } else if tok.token.tok_type == parse::ParseType::FNCALL {
+        make_fncall(tok.clone(), Some(scope_name), definitions)
     } else if tok.token.tok_type == parse::ParseType::LABEL {
         make_ident(tok.clone(), definitions)
     } else if tok.token.tok_type == parse::ParseType::STRING {
@@ -615,6 +687,7 @@ pub fn gen(
     } else if tok.token.tok_type == parse::ParseType::FNMAKE {
         make_func(tok, definitions)
     } else {
+        println!("{:#?}", tok.token);
         unimplemented!()
     }
 }

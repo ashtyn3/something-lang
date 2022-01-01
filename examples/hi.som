@@ -1,5 +1,6 @@
-add x i64, y i64 : i64
-    print! (x+y);
+add x i32, y i32: i32
+    print! (x+y), "\n";
 end
 
-print! x;
+add! 2,4;
+add! 8,2;
