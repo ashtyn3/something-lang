@@ -32,7 +32,7 @@ fn main() {
                 .long("gen")
                 .takes_value(false)
                 .help("Stops compiler at generation step (this also stops cleaning of work directory)."),
-        )
+        ).arg(Arg::with_name("run").short("r").long("run").takes_value(true).help("Automatically runs generated executable."))
         .get_matches();
 
     let f = fs::read_to_string(file.value_of("file_name").unwrap());
@@ -56,6 +56,7 @@ fn main() {
         let mut parser = parse::Parser::new(lexer.tree(), file_content, global_scope);
 
         parser.init();
+        println!("{:#?}", parser.clone().tree());
         let mut main_buffer: Vec<String> = vec![String::from("int main() {")];
         let def = &mut IndexMap::new();
         for tok in parser.clone().tree() {
@@ -84,6 +85,10 @@ fn main() {
             }
         } else {
             utils::make_work(joined, false);
+        }
+        if file.index_of("run").is_some() {
+            let args = file.value_of("run").unwrap();
+            utils::run_gen(args.to_string().split(" ").clone().collect());
         }
     }
 }

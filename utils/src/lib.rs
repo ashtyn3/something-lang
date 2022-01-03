@@ -1,7 +1,8 @@
 use nanoid::nanoid;
+use std::process::{Command, Stdio};
+
 use std::env;
 use std::fs;
-use std::process::Command;
 
 pub fn make_work(content: String, compile: bool) {
     let mut dir = env::temp_dir();
@@ -34,4 +35,15 @@ pub fn clean_work() {
     let mut dir = env::temp_dir();
     dir.push("something_work");
     fs::remove_dir_all(dir).expect("Failed to clean up work directory");
+}
+
+pub fn run_gen(args: Vec<&str>) {
+    let mut cmd = Command::new("./som.out")
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to run binary");
+    cmd.wait();
 }
