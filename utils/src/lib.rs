@@ -38,12 +38,21 @@ pub fn clean_work() {
 }
 
 pub fn run_gen(args: Vec<&str>) {
-    let mut cmd = Command::new("./som.out")
+    let child = Command::new("./som.out")
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()
-        .expect("Failed to run binary");
-    cmd.wait();
+        .spawn();
+
+    let output = child.unwrap().wait_with_output().unwrap();
+
+    if output.status.success() {
+        let raw_output = String::from_utf8(output.stdout);
+        println!("{}", raw_output.unwrap());
+    } else {
+        let err = String::from_utf8(output.stderr);
+        println!("{}", err.unwrap());
+        std::process::exit(1);
+    }
 }
