@@ -224,7 +224,7 @@ pub fn make_exp_seg(
                 token: seg.left,
                 token_real_type: Some(exp_type.clone()),
             },
-            scope.clone(),
+            "_".to_string(),
             definitions,
         );
         if seg.right.is_some() {
@@ -233,7 +233,7 @@ pub fn make_exp_seg(
                     token: seg.right.unwrap(),
                     token_real_type: Some(exp_type.clone()),
                 },
-                scope.clone(),
+                "_".to_string(),
                 definitions,
             );
             let line = format!("std::unique_ptr<INT{size}_LIT> {name}(new INT{size}_LIT(INT{size}_{:?}({left}, {right})));",seg.operation,name=id,size=size.clone(),left=left,right=right);
@@ -248,7 +248,7 @@ pub fn make_exp_seg(
                 token: seg.left,
                 token_real_type: Some(exp_type.clone()),
             },
-            scope.clone(),
+            "_".to_string(),
             definitions,
         );
         if seg.right.is_some() {
@@ -257,7 +257,7 @@ pub fn make_exp_seg(
                     token: seg.right.unwrap(),
                     token_real_type: Some(exp_type.clone()),
                 },
-                scope.clone(),
+                String::from("_"),
                 definitions,
             );
             let line = format!("std::unique_ptr<SIGINT{size}_LIT> {name}(new SIGINT{size}_LIT(SIGINT{size}_{:?}({left}, {right})));",seg.operation,name=id,size=size.clone(),left=left,right=right);
@@ -272,7 +272,7 @@ pub fn make_exp_seg(
                 token: seg.left,
                 token_real_type: Some(exp_type.clone()),
             },
-            scope.clone(),
+            String::from("_"),
             definitions,
         );
         if seg.right.is_some() {
@@ -281,7 +281,7 @@ pub fn make_exp_seg(
                     token: seg.right.unwrap(),
                     token_real_type: Some(exp_type),
                 },
-                scope.clone(),
+                String::from("_"),
                 definitions,
             );
             let line = format!("std::unique_ptr<FLOAT{size}_LIT> {name}(new FLOAT{size}_LIT(FLOAT{size}_{:?}({left}, {right})));",seg.operation,name=id,size=size.clone(),left=left,right=right);
@@ -470,6 +470,7 @@ fn make_std_fncall(
                         token_real_type: None,
                         token: arg,
                     },
+                    parent_scope.clone(),
                     definitions,
                 );
                 let arg_lit = format!(
@@ -531,11 +532,20 @@ fn make_std_fncall(
 
 fn make_ident(
     tok: DescriptorToken,
+    scope: Option<String>,
     definitions: &mut IndexMap<parse::Primitives, PrimType>,
 ) -> String {
     let lit = tok.token.ident.unwrap();
     init_lib(definitions, lit.var_type);
-    format!("(*{name})", name = lit.name)
+    if scope.clone().unwrap() == "_" {
+        format!("(*{name})", name = lit.name)
+    } else {
+        format!(
+            "{scope} = std::move({name});",
+            name = lit.name,
+            scope = scope.unwrap()
+        )
+    }
 }
 
 fn make_func(
@@ -681,7 +691,7 @@ pub fn gen(
     } else if tok.token.tok_type == parse::ParseType::FNCALL {
         make_fncall(tok.clone(), Some(scope_name), definitions)
     } else if tok.token.tok_type == parse::ParseType::LABEL {
-        make_ident(tok.clone(), definitions)
+        make_ident(tok.clone(), Some(scope_name), definitions)
     } else if tok.token.tok_type == parse::ParseType::STRING {
         make_string(tok.clone(), scope_name, definitions)
     } else if tok.token.tok_type == parse::ParseType::FNMAKE {
