@@ -56,7 +56,6 @@ fn main() {
         let mut parser = parse::Parser::new(lexer.tree(), file_content, global_scope);
 
         parser.init();
-        println!("{:#?}", parser.clone().tree());
         let mut main_buffer: Vec<String> = vec![String::from("int main() {")];
         let def = &mut IndexMap::new();
         for tok in parser.clone().tree() {
