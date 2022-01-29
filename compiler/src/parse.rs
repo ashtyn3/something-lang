@@ -474,7 +474,7 @@ impl Parser {
                     line: self.tok.loc.line,
                 },
                 number: Some(Number {
-                    num_type: Primitives::SIGINT(32),
+                    num_type: Primitives::INT(32),
                     number: Some(self.tok.content.parse::<i64>().unwrap()),
                     float: None,
                 }),
