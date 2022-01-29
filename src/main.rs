@@ -11,7 +11,7 @@ fn main() {
     let app = App::new("Something")
         .author("Ashtyn")
         .version(clap::crate_version!())
-        .about("a stackish based programming language that is also functional.");
+        .about("A functional programming language.");
 
     let file = app
         .arg(
