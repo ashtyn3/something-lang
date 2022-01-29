@@ -1,9 +1,7 @@
 use crate::som_std;
 use crate::LexToken;
 use crate::LexTokenLoc;
-use crate::Lexer;
 use crate::TokenType;
-use regex::Regex; // 1.1.8
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
