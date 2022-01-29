@@ -2,6 +2,10 @@ add x i32, y i32:i32
     ret (x+y);
 end
 
-hi:i32: add! 2,(-2+3);
+mul x i32, y i32:i32
+    ret (x*y);
+end
 
-print! hi;
+hi:i32: !(add 2, !(mul 2,2))
+!(print hi)
+!(print hi)
