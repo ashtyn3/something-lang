@@ -14,6 +14,7 @@ pub enum ParseType {
     FNCALL,
     FNMAKE,
     FNPARAM,
+    FNRETURN,
     LABEL,
     VARDEF,
 }
@@ -53,6 +54,11 @@ pub struct FuncDef {
     pub body: Vec<ParseTok>,
     pub params: Vec<VarInit>,
     pub is_std: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct FuncRet {
+    pub value: Option<ParseTok>,
 }
 
 #[derive(Clone, Debug)]
@@ -118,6 +124,7 @@ pub struct ParseTok {
     pub variable: Box<Option<VarInit>>,
     pub fncall: Box<Option<FnCall>>,
     pub fnmake: Box<Option<FuncDef>>,
+    pub fnreturn: Box<Option<FuncRet>>,
 }
 
 #[derive(Clone, Debug)]
@@ -410,6 +417,7 @@ impl Parser {
                 }),
                 string: None,
                 operand: None,
+                fnreturn: Box::new(None),
                 ident: None,
                 variable: Box::new(None),
                 fncall: Box::new(None),
@@ -438,6 +446,7 @@ impl Parser {
                 string: None,
                 operand: None,
                 ident: None,
+                fnreturn: Box::new(None),
                 variable: Box::new(None),
                 fncall: Box::new(None),
                 fnmake: Box::new(None),
@@ -458,6 +467,7 @@ impl Parser {
                 expression: None,
                 string: None,
                 operand: None,
+                fnreturn: Box::new(None),
                 ident: None,
                 variable: Box::new(None),
                 fncall: Box::new(None),
@@ -479,6 +489,7 @@ impl Parser {
                     float: None,
                 }),
                 expression: None,
+                fnreturn: Box::new(None),
                 string: None,
                 operand: None,
                 ident: None,
@@ -504,6 +515,7 @@ impl Parser {
                 operand: None,
                 ident: None,
                 variable: Box::new(None),
+                fnreturn: Box::new(None),
                 fncall: Box::new(None),
                 fnmake: Box::new(None),
             }
@@ -528,6 +540,7 @@ impl Parser {
             number: None,
             expression: None,
             string: None,
+            fnreturn: Box::new(None),
             operand: Some(Operand { op_type }),
             ident: None,
             variable: Box::new(None),
@@ -563,6 +576,7 @@ impl Parser {
             }),
             expression: None,
             number: None,
+            fnreturn: Box::new(None),
             string: None,
             fncall: Box::new(None),
             operand: None,
@@ -661,6 +675,7 @@ impl Parser {
             number: None,
             string: None,
             operand: None,
+            fnreturn: Box::new(None),
             ident: None,
             variable: Box::new(None),
             fncall: Box::new(None),
@@ -723,6 +738,8 @@ impl Parser {
             expression: None,
             number: None,
             string: None,
+
+            fnreturn: Box::new(None),
             operand: None,
             ident: None,
             fncall: Box::new(None),
@@ -790,6 +807,7 @@ impl Parser {
             },
             expression: None,
             number: None,
+            fnreturn: Box::new(None),
             string: None,
             operand: None,
             ident: None,
@@ -860,6 +878,7 @@ impl Parser {
     pub fn parse_string(&mut self) -> ParseTok {
         ParseTok {
             tok_type: ParseType::STRING,
+            fnreturn: Box::new(None),
             location: ParseLoc {
                 start_col: self.tok.loc.col,
                 end_col: self.tok.loc.end_col,
@@ -922,6 +941,7 @@ impl Parser {
                 },
                 expression: None,
                 number: None,
+                fnreturn: Box::new(None),
                 string: None,
                 operand: None,
                 ident: None,
@@ -938,6 +958,33 @@ impl Parser {
         );
         let mut func_scope = self.curr_scope.clone();
 
+        func_scope.insert(
+            "self_ret!".to_string(),
+            ParseTok {
+                tok_type: ParseType::FNMAKE,
+                location: ParseLoc {
+                    line: self.tok.loc.line,
+                    start_col: self.tok.loc.col,
+                    end_col: self.tok.loc.end_col,
+                },
+                expression: None,
+                number: None,
+                string: None,
+                operand: None,
+                fnreturn: Box::new(None),
+                ident: None,
+                variable: Box::new(None),
+                fncall: Box::new(None),
+                fnmake: Box::new(Some(FuncDef {
+                    return_type: ret_type.clone(),
+                    name: name.clone(),
+                    params: params.clone(),
+                    is_std: false,
+                    body: vec![],
+                })),
+            },
+        );
+
         for param in &params {
             func_scope.insert(
                 param.clone().name,
@@ -949,6 +996,7 @@ impl Parser {
                         line: self.tok.loc.line,
                     },
                     expression: None,
+                    fnreturn: Box::new(None),
                     number: None,
                     string: None,
                     operand: None,
@@ -984,6 +1032,7 @@ impl Parser {
             string: None,
             operand: None,
             ident: None,
+            fnreturn: Box::new(None),
             variable: Box::new(None),
             fncall: Box::new(None),
             fnmake: Box::new(Some(FuncDef {
@@ -996,6 +1045,56 @@ impl Parser {
         };
         self.curr_scope.insert(name.clone(), tok.clone());
         tok
+    }
+    fn parse_ret(&mut self) -> ParseTok {
+        self.next_tok(); // consume ret
+        let mut sub_tree = vec![];
+        while self.tok.content != ";" {
+            sub_tree.push(self.tok.clone());
+            self.next_tok();
+        }
+        self.next_tok();
+        let val = Parser::new(sub_tree, self.file.clone(), self.curr_scope.clone()).parse();
+
+        let val_type = get_prim(val.clone());
+        if prim_eq(
+            &self
+                .curr_scope
+                .get("self_ret!")
+                .unwrap()
+                .clone()
+                .fnmake
+                .unwrap()
+                .return_type,
+            &val_type,
+        ) {
+            ParseTok {
+                tok_type: ParseType::FNRETURN,
+                location: ParseLoc {
+                    start_col: self.tok.loc.col,
+                    end_col: self.tok.loc.end_col,
+                    line: self.tok.loc.line,
+                },
+                expression: None,
+                number: None,
+                string: None,
+                operand: None,
+                ident: None,
+                fnreturn: Box::new(Some(FuncRet { value: Some(val) })),
+                variable: Box::new(None),
+                fncall: Box::new(None),
+                fnmake: Box::new(None),
+            }
+        } else {
+            println!("Bad types ({line}:{col}): Return value of type {:?} for function {name} cannot be assigned to type {:?}",
+                        val_type,
+                        self.curr_scope.get("self_ret!").unwrap().clone().fnmake.unwrap().return_type,
+                        name=self.curr_scope.get("self_ret!").unwrap().clone().fnmake.unwrap().name,
+                        line = self.tok.loc.line,
+                        col = self.tok.loc.col
+                    );
+            std::process::exit(1);
+        }
     }
 
     pub fn tree(self) -> Vec<ParseTok> {
@@ -1023,6 +1122,8 @@ impl Parser {
         } else if self.tok.tok_type == TokenType::LABEL && self.peek().tok_type == TokenType::LABEL
         {
             self.parse_func_def()
+        } else if self.tok.content == "ret" {
+            self.parse_ret()
         } else if self.tok.tok_type == TokenType::LABEL {
             self.parse_ident()
         } else if self.tok.tok_type == TokenType::PLUSBIN
