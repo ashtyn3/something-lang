@@ -52,6 +52,9 @@ pub fn run_gen(args: Vec<&str>) {
         let raw_output = String::from_utf8(output.stdout);
         println!("{}", raw_output.unwrap());
     } else {
+        let out = String::from_utf8(output.stdout);
+        println!("{}", out.unwrap());
+
         let err = String::from_utf8(output.stderr);
         println!("{}", err.unwrap());
         std::process::exit(1);
