@@ -1,0 +1,7 @@
+thankYou name str:i32
+    print! "Thank you", name, "\n";
+
+    thankYou! name;
+end
+
+thankYou! "Ashtyn";
