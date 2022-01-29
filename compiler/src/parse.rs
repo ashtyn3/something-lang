@@ -803,11 +803,12 @@ impl Parser {
         }));
         self.next_tok();
         if call.fncall.clone().unwrap().is_std == false {
-            //TODO: check parameter types and if function exists for non standard library function.
-            if self.curr_scope.get(&name.to_string()).is_none() {
+            if self.curr_scope.get(&name.to_string()).is_none()
+                || self.curr_scope.get(&name.to_string()).unwrap().tok_type != ParseType::FNMAKE
+            {
                 println!(
                     "Undeclared function ({line}:{col}): Cannot call function {}",
-                    self.tok.content,
+                    name.to_string(),
                     line = self.tok.loc.line,
                     col = self.tok.loc.col
                 );
