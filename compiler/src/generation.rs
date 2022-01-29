@@ -723,6 +723,21 @@ pub fn make_fncall(
     decls.join("\n")
 }
 
+fn make_return(
+    tok: DescriptorToken,
+    definitions: &mut IndexMap<parse::Primitives, PrimType>,
+) -> String {
+    let gen_val = gen(
+        DescriptorToken {
+            token_real_type: None,
+            token: tok.token.fnreturn.unwrap().value.unwrap(),
+        },
+        String::from("RETURN"),
+        definitions,
+    );
+
+    gen_val
+}
 pub fn gen(
     tok: DescriptorToken,
     scope_name: String,
@@ -751,6 +766,8 @@ pub fn gen(
         make_string(tok.clone(), scope_name, definitions)
     } else if tok.token.tok_type == parse::ParseType::FNMAKE {
         make_func(tok, definitions)
+    } else if tok.token.tok_type == parse::ParseType::FNRETURN {
+        make_return(tok, definitions)
     } else {
         println!("{:#?}", tok.token);
         unimplemented!()
