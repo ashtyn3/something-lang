@@ -1,7 +1,0 @@
-add x i32, y i32: i32
-    answer:i32: (x+y+1);
-    print! answer, "\n";
-end
-
-add! 2,4;
-add! 8,2;

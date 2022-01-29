@@ -1,0 +1,10 @@
+counter count i32: i32
+    // function declaration with name of add that takes a i32 parameter named count and returns a i32 value.
+    print! count, "\n";
+
+    counter! (count+1);
+    // recursively calls count function
+end
+
+counter! 0;
+// function call of add function
