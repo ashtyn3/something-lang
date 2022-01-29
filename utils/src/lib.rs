@@ -7,10 +7,9 @@ use std::fs;
 pub fn make_work(content: String, compile: bool) {
     let mut dir = env::temp_dir();
     dir.push("something_work");
-    if dir.is_dir() == true {
-        fs::remove_dir_all(dir.clone()).expect("Failed to clean up work directory");
+    if dir.is_dir() == false {
+        fs::create_dir(&dir).expect("Failed to create work directory");
     }
-    fs::create_dir(&dir).expect("Failed to create work directory");
 
     dir.push("module.cc");
     fs::write(&dir, content).expect("Failed to write module");
@@ -34,7 +33,9 @@ pub fn make_work(content: String, compile: bool) {
 pub fn clean_work() {
     let mut dir = env::temp_dir();
     dir.push("something_work");
-    fs::remove_dir_all(dir).expect("Failed to clean up work directory");
+    if dir.is_dir() == true {
+        fs::remove_dir_all(dir).expect("Failed to clean up work directory");
+    }
 }
 
 pub fn run_gen(args: Vec<&str>) {
@@ -55,4 +56,14 @@ pub fn run_gen(args: Vec<&str>) {
         println!("{}", err.unwrap());
         std::process::exit(1);
     }
+}
+
+pub fn make_lib(name: String, content: String) {
+    let mut dir = env::temp_dir();
+    dir.push("something_work");
+    if dir.is_dir() == false {
+        fs::create_dir(&dir).expect("Failed to create work directory");
+    }
+    dir.push(name.clone() + ".cc");
+    fs::write(&dir, content).expect("Failed to make library.");
 }

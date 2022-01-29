@@ -43,6 +43,7 @@ fn main() {
             file.value_of("file_name").unwrap()
         )
     } else {
+        utils::clean_work();
         let file_content = f.unwrap();
         let mut lexer = Lexer::new(file_content.chars().collect());
 
@@ -72,17 +73,39 @@ fn main() {
         main_buffer.push(String::from("return 0;\n}"));
         let mut defs: Vec<String> = def
             .values()
-            .map(|item| -> String { item.def.clone() })
+            .map(|item| -> String {
+                if item.ext == false {
+                    return item.def.clone();
+                };
+                String::from("")
+            })
             .collect();
+
+        let mut extern_defs: Vec<String> = def
+            .values()
+            .map(|item| -> String {
+                if item.ext == true {
+                    return item.def.clone();
+                };
+                String::from("")
+            })
+            .collect();
+
         defs.append(&mut main_buffer);
-        defs.insert(0, "#include<memory>".to_string());
+
+        extern_defs.insert(0, "#include<memory>".to_string());
+        extern_defs.insert(0, "#include<vector>".to_string());
+        defs.insert(0, "#include \"som_std.cc\"".to_string());
+
         let joined = defs.join("\n");
         if file.index_of("gen").is_none() {
+            utils::make_lib(String::from("som_std"), extern_defs.join("\n"));
             utils::make_work(joined, true);
             if file.index_of("dev-mode").is_none() {
                 utils::clean_work();
             }
         } else {
+            utils::make_lib(String::from("som_std"), extern_defs.join("\n"));
             utils::make_work(joined, false);
         }
         if file.index_of("run").is_some() {
