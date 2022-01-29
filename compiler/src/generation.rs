@@ -679,8 +679,10 @@ pub fn make_fncall(
         let name = &arg.name;
         let mut sc = scope_name.to_owned();
 
-        if sc.clone().unwrap() == "_" {
+        if sc.clone().unwrap() == "_" || sup_arg.tok_type == parse::ParseType::EXP {
             sc = Some(format!("{id}.{name}", id = id, name = name));
+        } else {
+            sc = Some("_".to_string())
         }
         let val = gen(
             DescriptorToken {
@@ -692,7 +694,10 @@ pub fn make_fncall(
         );
         let type_str = definitions.get(&arg.value_type).unwrap().name.clone();
         init_lib(definitions, arg.clone().value_type);
-        if scope_name.clone().unwrap() != "_" {
+        if scope_name.clone().unwrap() != "_"
+            && sup_arg.tok_type != parse::ParseType::EXP
+            && sup_arg.tok_type != parse::ParseType::FNCALL
+        {
             params.push(format!(
                 "{id}.{name} = std::make_unique<{TYPE}>({val});",
                 id = id,
@@ -715,7 +720,7 @@ pub fn make_fncall(
     decls.push(base.clone());
     if scope_name.is_some() && scope_name.clone().unwrap() != "_" {
         decls.push(format!(
-            "{name} = *{id}->RETURN",
+            "{name} = std::move({id}.RETURN);",
             name = scope_name.unwrap(),
             id = id
         ));
