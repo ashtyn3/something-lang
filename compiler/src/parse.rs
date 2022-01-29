@@ -66,6 +66,7 @@ pub struct FnCall {
     pub name: String,
     pub is_std: bool,
     pub args: Vec<ParseTok>,
+    pub ret_type: Option<Primitives>,
 }
 
 #[derive(Clone, Debug)]
@@ -207,6 +208,7 @@ fn get_prim(tok: ParseTok) -> Primitives {
         ParseType::STRING => Primitives::STRING,
         ParseType::OPERATOR => Primitives::OPERATOR,
         ParseType::EXP => tok.expression.unwrap().exp_type,
+        ParseType::FNCALL => tok.fncall.unwrap().ret_type.unwrap(),
         ParseType::LABEL => {
             if tok.clone().ident.unwrap().var_type == Primitives::INSCOPE("i8".to_string()) {
                 Primitives::INT(8)
@@ -263,7 +265,10 @@ impl Parser {
                 tok_type: TokenType::EOF,
                 content: String::from(""),
                 loc: LexTokenLoc {
-                    ..self.lex_tree.last().unwrap().loc
+                    line: self.lex_tree.last().unwrap().loc.line + 1,
+                    line_start: self.lex_tree.last().unwrap().loc.line_start + 1,
+                    col: self.lex_tree.last().unwrap().loc.col + 1,
+                    end_col: self.lex_tree.last().unwrap().loc.end_col + 1,
                 },
             }
         } else {
@@ -277,7 +282,10 @@ impl Parser {
                 tok_type: TokenType::EOF,
                 content: String::from(""),
                 loc: LexTokenLoc {
-                    ..self.lex_tree.last().unwrap().loc
+                    line: self.lex_tree.last().unwrap().loc.line + 1,
+                    line_start: self.lex_tree.last().unwrap().loc.line_start + 1,
+                    col: self.lex_tree.last().unwrap().loc.col + 1,
+                    end_col: self.lex_tree.last().unwrap().loc.end_col + 1,
                 },
             }
         } else {
@@ -710,7 +718,8 @@ impl Parser {
         self.next_tok();
         self.next_tok();
         let mut sub_tree = vec![];
-        while self.tok.content != ";" {
+        let curr_line = self.tok.loc.line;
+        while self.tok.loc.line == curr_line {
             sub_tree.push(self.tok.clone());
             self.next_tok()
         }
@@ -727,7 +736,6 @@ impl Parser {
             std::process::exit(1);
         }
 
-        self.next_tok();
         let ret_tok = ParseTok {
             tok_type: ParseType::VARDEF,
             location: ParseLoc {
@@ -797,6 +805,7 @@ impl Parser {
             args: args.clone(),
             is_std: false,
             name: name.to_string(),
+            ret_type: None,
         };
         let mut call = ParseTok {
             tok_type: ParseType::FNCALL,
@@ -855,6 +864,18 @@ impl Parser {
                 col = self.tok.loc.col
                 )
             }
+            call.fncall = Box::new(call.fncall.clone().map(|mut s| {
+                s.ret_type = Some(
+                    self.curr_scope
+                        .get(&name.to_string())
+                        .unwrap()
+                        .clone()
+                        .fnmake
+                        .unwrap()
+                        .return_type,
+                );
+                s
+            }));
             for parent_arg in func.params {
                 let mut arg: Option<ParseTok> = None;
                 for sup_arg in args.clone() {
