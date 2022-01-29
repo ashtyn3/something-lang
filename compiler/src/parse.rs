@@ -1334,7 +1334,6 @@ impl Parser {
     pub fn init(&mut self) {
         while true == true {
             let res = &self.parse();
-            println!("{:?}", self.tok);
             self.tree.push(res.to_owned());
             if self.tok.tok_type == TokenType::EOF {
                 break;
