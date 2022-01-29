@@ -1,0 +1,7 @@
+add x i32, y i32:i32
+    ret (x+y);
+end
+
+hi:i32: add! 2,(-2+3);
+
+print! hi;
