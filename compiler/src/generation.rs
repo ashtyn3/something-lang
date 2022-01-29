@@ -679,7 +679,10 @@ pub fn make_fncall(
         let name = &arg.name;
         let mut sc = scope_name.to_owned();
 
-        if sc.clone().unwrap() == "_" || sup_arg.tok_type == parse::ParseType::EXP {
+        if sc.clone().unwrap() == "_"
+            || sup_arg.tok_type == parse::ParseType::EXP
+            || sup_arg.tok_type == parse::ParseType::FNCALL
+        {
             sc = Some(format!("{id}.{name}", id = id, name = name));
         } else {
             sc = Some("_".to_string())
