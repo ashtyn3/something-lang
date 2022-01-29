@@ -1,6 +1,6 @@
 // this is a comment
 
-wow:str: "hi world";
+wow:str: "hi world"
 //variable declaration with name wow and type of string.
 
 print! wow;

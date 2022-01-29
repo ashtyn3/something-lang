@@ -5,7 +5,7 @@ A functional programming language that.
 The goal of Something is to be as simple as possible. You could almost say the python of functional staticly typed languages.
 
 ```rust
-greeting:str: "hello world";
+greeting:str: "hello world"
 print! greeting;
 ```
 
