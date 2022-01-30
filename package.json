@@ -1,14 +1,26 @@
 {
-  "name": "something-lang",
-  "version": "1.0.0",
-  "description": "A functional programming language",
-  "main": "\"\"",
-  "repository": "git@github.com:ashtyn3/something-lang.git",
-  "author": "ashtyn3",
-  "license": "MIT",
-  "devDependencies": {
-    "husky": "^7.0.4",
-    "@commitlint/cli": "^16.1.0",
-    "@commitlint/config-conventional": "^16.0.0"
-  }
+    "name": "something-lang",
+    "version": "1.0.0",
+    "description": "A functional programming language",
+    "main": "\"\"",
+    "repository": "git@github.com:ashtyn3/something-lang.git",
+    "author": "ashtyn3",
+    "license": "MIT",
+    "devDependencies": {
+        "@commitlint/cli": "^16.1.0",
+        "@commitlint/config-conventional": "^16.0.0",
+        "cz-conventional-changelog": "3.3.0",
+        "husky": "^7.0.4"
+    },
+    "husky": {
+        "hooks": {
+            "prepare-commit-msg": "exec < /dev/tty && git cz --hook || true"
+        }
+    },
+    "dependencies": {},
+    "config": {
+        "commitizen": {
+            "path": "./node_modules/cz-conventional-changelog"
+        }
+    }
 }
