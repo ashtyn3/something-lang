@@ -6,6 +6,7 @@ use crate::parse;
 pub fn is_std_fn(fn_call: &mut parse::ParseTok) -> bool {
     match fn_call.clone().fncall.unwrap().name.as_str() {
         "print" => true,
+        "include" => true,
         _ => false,
     }
 }
