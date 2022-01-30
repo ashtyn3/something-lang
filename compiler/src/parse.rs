@@ -1039,7 +1039,7 @@ impl Parser {
         call
     }
     pub fn parse_string(&mut self) -> ParseTok {
-        ParseTok {
+        let tok = ParseTok {
             tok_type: ParseType::STRING,
             fnreturn: Box::new(None),
             location: ParseLoc {
@@ -1058,7 +1058,9 @@ impl Parser {
             variable: Box::new(None),
             fncall: Box::new(None),
             fnmake: Box::new(None),
-        }
+        };
+        self.next_tok();
+        tok
     }
     pub fn parse_func_def(&mut self) -> ParseTok {
         let name = self.tok.content.clone();
