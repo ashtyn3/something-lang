@@ -19,6 +19,7 @@ pub fn make_work(content: String) {
 pub fn compile_gen() {
     let mut dir = env::temp_dir();
     dir.push("something_work");
+    dir.push("module.cc");
     let mut current_dir = env::current_dir().unwrap();
     current_dir.push("som.out");
     let mut build = Command::new("g++")
