@@ -181,6 +181,24 @@ int print(std::vector<std::unique_ptr<STR_LIT>>* ARGS) {{
     );
 }
 
+pub fn init_fn_include(definitions: &mut IndexMap<parse::Primitives, PrimType>, path: String) {
+    definitions.insert(
+        parse::Primitives::INSCOPE("include".to_string()),
+        PrimType {
+            def: format!(
+                "
+#include \"{}\"
+                ",
+                path
+            )
+            .to_string(),
+            name: "include".to_string(),
+            raw: None,
+            ext: true,
+        },
+    );
+}
+
 pub fn make_var_def(
     _scope: String,
     definitions: &mut IndexMap<parse::Primitives, PrimType>,
@@ -540,8 +558,18 @@ fn make_std_fncall(
                 );
                 arg_decls.append(&mut base);
                 arg_decls.push(arg_lit);
+            }
+        } else if tok.token.fncall.clone().unwrap().name == "include" {
+            if arg.tok_type == parse::ParseType::STRING {
+                init_fn_include(definitions, arg.string.unwrap().content)
             } else {
-                unimplemented!();
+                println!(
+                        "Bad type({line},{col}): Include takes argument of type STRING instead got type {:?}",
+                        arg.tok_type,
+                        line = arg.location.line,
+                        col = arg.location.start_col
+                    );
+                std::process::exit(1);
             }
         }
     }
@@ -553,13 +581,13 @@ fn make_std_fncall(
             name = scope.clone(),
         );
         arg_decls.insert(0, arg_lit);
+        let print_call = format!(
+            "{fnName}(&{name});",
+            name = scope.clone(),
+            fnName = tok.token.fncall.unwrap().name
+        );
+        arg_decls.push(print_call);
     }
-    let print_call = format!(
-        "{fnName}(&{name});",
-        name = scope.clone(),
-        fnName = tok.token.fncall.unwrap().name
-    );
-    arg_decls.push(print_call);
     //definitions.get(&parse::Primitives::INSCOPE("PRINT".to_string()));
     arg_decls.join("\n")
 }
